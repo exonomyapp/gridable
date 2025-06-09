@@ -25,6 +25,9 @@
           <v-list-item link to="/editor/view-editor">
             <v-list-item-title>View Editor</v-list-item-title>
           </v-list-item>
+          <!-- <v-list-item link to="/execute/view?address=YOUR_VIEW_DB_ADDRESS_HERE">
+            <v-list-item-title>Execute View (Test)</v-list-item-title>
+          </v-list-item> -->
           <!-- Profile and Settings links are now in UserProfileChip dropdown -->
         </v-list>
       </nav>

@@ -1,267 +1,295 @@
 <template>
   <v-container fluid class="view-editor-container">
     <v-row>
-      <v-col cols="12" class="d-flex justify-space-between align-center">
+      <v-col cols="12" class="d-flex justify-space-between align-center pb-0">
         <div>
-          <h2>View Editor (Conceptual Design)</h2>
-          <p class="text-caption">
-            Design views, define relationships, and set criteria.
-          </p>
+          <v-text-field
+            v-model="currentViewName"
+            label="View Name"
+            placeholder="Enter a name for your view"
+            dense
+            hide-details
+            class="mr-4"
+            style="max-width: 400px; display: inline-block;"
+          ></v-text-field>
         </div>
-        <v-btn color="primary" @click="shareDialog = true" prepend-icon="mdi-share-variant">
-          Share View
-        </v-btn>
+        <div>
+          <v-btn @click="loadUserTables(true)" :loading="loadingTables" small class="mr-2">Refresh Tables</v-btn>
+          <v-btn @click="handleLoadView" small class="mr-2" :disabled="!authStore.isAuthenticated">Load View</v-btn>
+          <v-btn @click="handleSaveView" color="primary" prepend-icon="mdi-content-save" :disabled="designedTables.length === 0 || !currentViewName || !authStore.isAuthenticated" :loading="savingView">
+            Save View
+          </v-btn>
+          <!-- Share button removed for now, can be re-added -->
+        </div>
+      </v-col>
+      <v-col cols="12" class="pt-0">
+         <p class="text-caption" v-if="currentViewDbAddress">
+            Current View DB Address: {{ currentViewDbAddress }} (Copied to clipboard on save)
+          </p>
       </v-col>
     </v-row>
 
-    <!-- Share Dialog Placeholder -->
-    <v-dialog v-model="shareDialog" max-width="600px">
+    <!-- Load View Dialog -->
+    <v-dialog v-model="loadViewDialog" max-width="500px">
       <v-card>
-        <v-card-title>
-          <span class="text-h5">Share View: {{ currentViewName || 'Untitled View' }}</span>
-        </v-card-title>
+        <v-card-title>Load View from OrbitDB Address</v-card-title>
         <v-card-text>
-          <p class="text-body-2 mb-4">
-            This is a placeholder for sharing functionality. Views will be published via Helia/IPFS,
-            allowing sharing with other DIDs.
-          </p>
-
           <v-text-field
-            v-model="recipientDid"
-            label="Recipient DID (did:example:...)"
-            placeholder="Enter the DID of the user to share with"
-            class="mb-3"
+            v-model="viewAddressToLoad"
+            label="OrbitDB View Address"
+            placeholder="Enter the full OrbitDB address of the view"
           ></v-text-field>
-
-          <v-select
-            v-model="selectedThemeForSharing"
-            :items="availableThemesForSharing"
-            item-title="name"
-            item-value="id"
-            label="Theme to Share With View"
-            placeholder="Share with a specific theme, or allow recipient to choose"
-            class="mb-3"
-            clearable
-          >
-            <template v-slot:prepend-item>
-              <v-list-item title="Share without specific theme" @click="selectedThemeForSharing = null"></v-list-item>
-              <v-divider class="mt-2"></v-divider>
-            </template>
-          </v-select>
-
-          <v-checkbox
-            v-model="allowRecipientThemeSelection"
-            label="Allow recipient to select from their own themes"
-            :disabled="!!selectedThemeForSharing"
-          ></v-checkbox>
-
-          <p class="text-caption mt-4">
-            <strong>Conceptual Data for Sharing (to be stored in OrbitDB):</strong>
-            <ul>
-              <li>View Definition OrbitDB Address</li>
-              <li>Owner DID</li>
-              <li>Recipient DIDs list (or public flag)</li>
-              <li>Permissions per recipient (e.g., read-only, can_copy) - Advanced</li>
-              <li>Shared Theme OrbitDB Address (optional)</li>
-              <li>Flag: Allow recipient to use their own themes</li>
-            </ul>
-          </p>
+          <p class="text-caption">For now, manually paste a previously saved view address.</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="blue-darken-1" text @click="shareDialog = false">Close</v-btn>
-          <v-btn color="blue-darken-1" variant="tonal" @click="handleShareConfirm" :disabled="!recipientDid">
-            Share (Placeholder)
-          </v-btn>
+          <v-btn text @click="loadViewDialog = false">Cancel</v-btn>
+          <v-btn color="primary" @click="confirmLoadView" :disabled="!viewAddressToLoad">Load</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <v-row class="editor-panes">
-      <!-- Pane 1: Available Tables/Sources (Left Sidebar) -->
+    <v-row class="editor-panes mt-2">
+      <!-- Pane 1: Available Tables -->
       <v-col cols="12" md="3" class="tables-pane">
         <v-card class="fill-height">
           <v-card-title>Available Tables</v-card-title>
           <v-card-text>
-            <v-list dense>
-              <v-list-item
-                v-for="table in availableTables"
-                :key="table.id"
-                @click="() => addTableToDesign(table)"
-                link
-              >
-                <v-list-item-title>{{ table.name }}</v-list-item-title>
-                <v-tooltip activator="parent" location="end">Drag or click to add to design</v-tooltip>
+            <div v-if="loadingTables" class="text-center pa-4"><v-progress-circular indeterminate></v-progress-circular></div>
+            <v-list dense v-else-if="availableTablesForDisplay.length > 0">
+              <v-list-item v-for="table in availableTablesForDisplay" :key="table.id" @click="() => addTableToDesign(table)" link>
+                <v-list-item-title :title="table.id">{{ table.name }}</v-list-item-title>
               </v-list-item>
             </v-list>
-            <p v-if="availableTables.length === 0" class="text-caption">
-              No OrbitDB tables found or loaded. (Placeholder)
-            </p>
+            <p v-else class="text-caption pa-3">No tables. <v-btn small variant="text" @click="registerSampleTables" :loading="loadingTables">Register Samples</v-btn></p>
           </v-card-text>
         </v-card>
       </v-col>
 
-      <!-- Pane 2: Visual Design Surface (Center) -->
+      <!-- Pane 2: Visual Design Surface -->
       <v-col cols="12" md="9" class="design-surface-pane">
         <v-card class="fill-height">
           <v-card-title>View Design Surface</v-card-title>
-          <v-card-text class="design-surface">
-            <p class="text-h6 text-center grey--text" v-if="designedTables.length === 0">
-              Add tables from the left panel to start designing your view.
-            </p>
-            <div
-              v-for="table in designedTables"
-              :key="table.id"
-              class="designed-table-representation"
-              :style="{ top: table.y + 'px', left: table.x + 'px' }"
-            >
+          <v-card-text class="design-surface" ref="designSurfaceRef" @dragover.prevent="handleDragOver" @drop.prevent="handleDropOnSurface">
+            <div v-for="(table, index) in designedTables" :key="table.id" :id="'designed_table_' + table.id.replace(/[^a-zA-Z0-9]/g, '_')"
+              class="designed-table-representation" :style="{ top: table.y + 'px', left: table.x + 'px', cursor: 'grab' }"
+              draggable="true" @dragstart="event => handleTableDragStart(event, table, index)" @dragend="handleTableDragEnd">
               <strong>{{ table.name }}</strong>
-              <ul>
+               <ul class="field-list">
                 <li v-for="field in table.fields" :key="field.name">
-                  {{ field.name }} ({{ field.type }})
+                  <v-icon size="x-small" class="mr-1">{{ getFieldIcon(field.type) }}</v-icon>
+                  {{ field.name }}
+                  <span class="text-caption grey--text">({{ field.type }})</span>
                 </li>
               </ul>
             </div>
-            <p class="text-caption mt-4">
-              Future: Drag tables here, draw lines between fields to create relationships.
-            </p>
+            <p class="text-h6 text-center grey--text" v-if="designedTables.length === 0 && !draggedTable">Add tables to design.</p>
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
 
     <v-row class="criteria-pane-row mt-4">
-      <!-- Pane 3: Criteria Grid (Bottom, AG Grid like) -->
+      <!-- Pane 3: Criteria Grid -->
       <v-col cols="12">
         <v-card>
           <v-card-title>Field Selection & Criteria Grid</v-card-title>
           <v-card-text>
-            <p class="text-caption mb-2">
-              Define output fields, aliases, sort order, filter criteria, and grouping.
-            </p>
-            <GridableGrid
-              :column-defs="criteriaGridColDefs"
-              :row-data="criteriaGridRowData"
-              :items-per-page="10"
-            />
+            <p class="text-caption mb-2" v-if="designedTables.length === 0">Add tables to the design surface to see their fields here.</p>
+            <GridableGrid v-else :column-defs="criteriaGridColDefs" :row-data="criteriaGridRowData" :items-per-page="10" @cell-value-changed="handleCriteriaGridChange" />
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
-
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import GridableGrid from '~/components/core/GridableGrid.vue';
+import { useAuthStore } from '~/store/auth';
+import { getAllTableMetadata, registerTable, getTableMetadata, type TableMetadata, type TableFieldSchema } from '~/services/userPreferences';
+// Import OrbitDB document store functions
+import { getDocumentStoreDatabase, putDocument, getDocumentById as getOrbitDocById } from '~/services/orbitdb';
 
-// --- Dialog State ---
-const shareDialog = ref(false);
-const recipientDid = ref('');
-const currentViewName = ref('My Sample View'); // Placeholder for actual view name
+const authStore = useAuthStore();
 
-interface ThemeOption {
-  id: string;
+// --- View Definition Interface ---
+interface ViewTableReference {
+  tableId: string;
+  orbitDBAddress: string;
   name: string;
+  alias?: string;
+  x: number;
+  y: number;
 }
-const selectedThemeForSharing = ref<string | null>(null);
-const availableThemesForSharing = ref<ThemeOption[]>([ // Placeholder themes
-  { id: 'theme1', name: 'Dark Mode Grid' },
-  { id: 'theme2', name: 'Light Professional' },
-  { id: 'theme3', name: 'High Contrast' },
-]);
-const allowRecipientThemeSelection = ref(true);
+interface CriteriaRow { // Re-defining or ensuring it's compatible
+  field: string; table: string; alias?: string; output: boolean; sort?: 'asc' | 'desc' | ''; filter?: string; group?: boolean;
+}
+interface ViewDefinition {
+  _id?: string;
+  viewId: string;
+  viewName: string;
+  tables: ViewTableReference[];
+  relationships: any[];
+  criteria: CriteriaRow[];
+  ownerDID: string;
+  createdTimestamp: number;
+  lastModifiedTimestamp: number;
+}
+
+// --- Component State ---
+const currentViewName = ref('');
+const currentViewId = ref<string | null>(null);
+const currentViewDbAddress = ref<string | null>(null);
+const savingView = ref(false);
+const loadingView = ref(false);
+
+const loadViewDialog = ref(false);
+const viewAddressToLoad = ref('');
 
 
-// --- Placeholder Data & Methods (from previous step, condensed for brevity) ---
-interface TableField { name: string; type: string; }
-interface TableSource { id: string; name: string; fields: TableField[]; x?: number; y?: number; }
-interface CriteriaRow { field: string; table: string; alias?: string; output?: boolean; sort?: 'asc' | 'desc' | ''; filter?: string; group?: boolean; }
+// --- Available Tables (condensed) ---
+const availableTablesInternal = ref<TableMetadata[]>([]);
+const loadingTables = ref(false);
+const availableTablesForDisplay = computed(() => availableTablesInternal.value.map(tm => ({ id: tm.tableId, name: tm.tableName, fields: tm.schemaDefinition.map(f => ({ name: f.name, type: f.type })), originalMetadata: tm })));
+async function loadUserTables(forceRefresh = false) { if (!authStore.isAuthenticated && !authStore.loading) { await authStore.login("DevUserEditorLoad"); if (!authStore.isAuthenticated) { console.error("Mock login failed for table load."); loadingTables.value = false; return; } } else if (authStore.loading) { return; } loadingTables.value = true; try { const tables = await getAllTableMetadata(); availableTablesInternal.value = tables; } catch (error) { console.error("Error loading tables:", error); availableTablesInternal.value = []; } finally { loadingTables.value = false; } }
+async function registerSampleTables() { if (!authStore.currentUser?.did) { await authStore.login("DevUserSamplesReg"); if(!authStore.currentUser?.did) { alert("Login needed to register samples."); return; }} loadingTables.value = true; const owner = authStore.currentUser.did; const sTData: Omit<TableMetadata, 'oDID'|'cTS'>[] = [ {tId:'cust', tN:'Cust', oA:'custAddr', sch:[{n:'ID',t:'s'}]}, {tId:'ord', tN:'Ord',oA:'ordAddr',sch:[{n:'OID',t:'s'}]}]; try { for(const tD of sTData){ const ex=await getTableMetadata(tD.tableId); if(!ex) await registerTable({...tD, ownerDID:owner,createdTimestamp:Date.now()});} await loadUserTables(true); } catch(e){console.error(e);}finally{loadingTables.value=false;} }
+onMounted(() => { if (authStore.isAuthenticated) { loadUserTables(); } else { const unW = watch(() => authStore.currentUser, (nu) => { if(nu){ loadUserTables(); unW(); } }, {immediate: true}); } });
 
-const availableTables = ref<TableSource[]>([
-  { id: 'table1', name: 'Customers', fields: [{name: 'CustomerID', type: 'string'}, {name: 'Name', type: 'string'}] },
-  { id: 'table2', name: 'Orders', fields: [{name: 'OrderID', type: 'string'}, {name: 'CustomerID', type: 'string'}] },
-]);
-const designedTables = ref<TableSource[]>([]);
+// --- Visual Design Surface (condensed) ---
+interface DesignedTableDisplay { id: string; name: string; fields: { name: string; type: string; }[]; x: number; y: number; originalMetadata?: TableMetadata; orbitDBAddress?: string; }
+const designedTables = ref<DesignedTableDisplay[]>([]);
 let tableCounter = 0;
-const criteriaGridColDefs = ref([ { headerName: 'Field', field: 'field' }, { headerName: 'Table', field: 'table' }]);
-const criteriaGridRowData = ref<CriteriaRow[]>([]);
+const designSurfaceRef = ref<HTMLElement | null>(null);
+const draggedTable = ref<DesignedTableDisplay | null>(null);
+const dragOffsetX = ref(0); const dragOffsetY = ref(0); const draggedTableIndex = ref(-1);
+function handleTableDragStart(event: DragEvent, table: DesignedTableDisplay, index: number) { draggedTable.value = table; draggedTableIndex.value = index; const el = document.getElementById('designed_table_' + table.id.replace(/[^a-zA-Z0-9]/g, '_')); if(el){const r=el.getBoundingClientRect(); dragOffsetX.value=event.clientX-r.left; dragOffsetY.value=event.clientY-r.top;} else {dragOffsetX.value=event.offsetX; dragOffsetY.value=event.offsetY;} if(event.dataTransfer){event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',table.id);} if(event.target && event.target instanceof HTMLElement) event.target.style.cursor='grabbing'; }
+function handleDragOver(event: DragEvent) { event.preventDefault(); }
+function handleDropOnSurface(event: DragEvent) { event.preventDefault(); if (draggedTable.value && draggedTableIndex.value !== -1 && designSurfaceRef.value) { const sR = designSurfaceRef.value.getBoundingClientRect(); let nX = event.clientX - sR.left - dragOffsetX.value; let nY = event.clientY - sR.top - dragOffsetY.value; const tE = document.getElementById('designed_table_' + draggedTable.value.id.replace(/[^a-zA-Z0-9]/g, '_')); const tW = tE?.offsetWidth||220; const tH = tE?.offsetHeight||150; nX=Math.max(0,Math.min(nX,sR.width-tW)); nY=Math.max(0,Math.min(nY,sR.height-tH)); const tU = designedTables.value[draggedTableIndex.value]; if(tU){tU.x=nX; tU.y=nY;} } }
+function handleTableDragEnd(event: DragEvent) { if(event.target && event.target instanceof HTMLElement) event.target.style.cursor='grab'; draggedTable.value=null;draggedTableIndex.value=-1;dragOffsetX.value=0;dragOffsetY.value=0; }
 
-const addTableToDesign = (table: TableSource) => {
+const addTableToDesign = (table: {id: string, name: string, fields: {name: string, type: string}[], originalMetadata?: TableMetadata}) => {
   if (!designedTables.value.find(t => t.id === table.id)) {
-    designedTables.value.push({ ...table, x: (tableCounter % 3) * 220 + 20, y: Math.floor(tableCounter / 3) * 150 + 20 });
+    designedTables.value.push({
+      ...table,
+      orbitDBAddress: table.originalMetadata?.orbitDBAddress,
+      x: (tableCounter % 3) * 240 + 20, y: Math.floor(tableCounter / 3) * 180 + 20
+    });
     tableCounter++;
     table.fields.forEach(field => {
       if (!criteriaGridRowData.value.find(r => r.field === field.name && r.table === table.name)) {
-        criteriaGridRowData.value.push({ field: field.name, table: table.name, output: true, sort: '', filter: '', group: false });
+        criteriaGridRowData.value.push({ field: field.name, table: table.name, output: true, sort: '', filter: '', group: false, alias: '' });
       }
     });
   }
 };
 
-const handleShareConfirm = () => {
-  if (!recipientDid.value) {
-    alert('Please enter a recipient DID.');
-    return;
+// --- Criteria Grid (condensed) ---
+const criteriaGridColDefs = ref([ { headerName: 'Output', field: 'output', cellRenderer: 'checkbox', width:100 }, { headerName: 'Field', field: 'field' }, { headerName: 'Table', field: 'table' }, { headerName: 'Alias', field: 'alias', editable: true }, { headerName: 'Sort', field: 'sort', width:120 }, { headerName: 'Filter', field: 'filter', editable: true }, { headerName: 'Group By', field: 'group', cellRenderer: 'checkbox', width:100 } ]);
+const criteriaGridRowData = ref<CriteriaRow[]>([]);
+function handleCriteriaGridChange(event: { row: CriteriaRow, field: string, newValue: any }) { console.log('Criteria change:', event); }
+
+// --- Save View Logic ---
+async function handleSaveView() {
+  if (!authStore.currentUser?.did || !currentViewName.value) {
+    alert("User not authenticated or view name is missing."); return;
   }
-  alert(`Sharing (placeholder action):
-    View: ${currentViewName.value}
-    To DID: ${recipientDid.value}
-    Theme ID: ${selectedThemeForSharing.value || 'None specified'}
-    Allow Recipient Themes: ${allowRecipientThemeSelection.value}
-  `);
-  shareDialog.value = false;
-  // Actual sharing logic via OrbitDB/Helia will be implemented later.
-};
+  savingView.value = true;
+  try {
+    const viewDefinition: ViewDefinition = {
+      viewId: currentViewId.value || `view_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      viewName: currentViewName.value,
+      tables: designedTables.value.map(dt => ({
+        tableId: dt.id, orbitDBAddress: dt.orbitDBAddress || dt.originalMetadata?.orbitDBAddress || '', name: dt.name, alias: '', x: dt.x, y: dt.y,
+      })),
+      relationships: [],
+      criteria: criteriaGridRowData.value.map(cr => ({...cr})),
+      ownerDID: authStore.currentUser.did,
+      createdTimestamp: currentViewId.value ? (await getLoadedViewDefinitionForTimestamp(currentViewDbAddress.value))?.createdTimestamp || Date.now() : Date.now(),
+      lastModifiedTimestamp: Date.now(),
+    };
+    if(currentViewId.value) viewDefinition._id = currentViewId.value;
 
-/*
-Conceptual Data Model for a "SharedViewLink" object (stored in an OrbitDB database, perhaps one per user or a global one):
-{
-  sharedViewId: string; // Unique ID for this sharing instance
-  originalViewOrbitDBAddress: string; // Address of the actual view definition
-  ownerDid: string; // DID of the user who owns/created the view
-  recipientDid: string; // DID of the user this view is shared with (or '*' for public)
-  sharedTimestamp: number; // Timestamp of when it was shared
+    const dbNameForView = currentViewDbAddress.value || `gridable-viewdef-${viewDefinition.viewId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    // TODO: Implement DID-based Access Control for the view definition DB
+    const viewDb = await getDocumentStoreDatabase(dbNameForView /*, { accessController: { type: 'did', write: [authStore.currentUser.did] }} */);
 
-  // Theme information for the recipient
-  specifiedThemeOrbitDBAddress?: string; // Optional: OrbitDB address of a specific theme to apply
-  allowRecipientThemeSelection: boolean; // If true, recipient can use their own themes or default
+    const docId = await putDocument(viewDb, viewDefinition);
 
-  // Permissions (Future Enhancement)
-  // permissions: {
-  //   canRead: boolean; // Always true for a share
-  //   canCopyDefinition: boolean; // Can the recipient duplicate the view structure?
-  //   canReshare: boolean; // Can the recipient share it with others?
-  // }
+    if (!viewDefinition._id && docId.startsWith('zd')) viewDefinition._id = docId; // If OrbitDB assigned an _id
+    currentViewId.value = viewDefinition._id || viewDefinition.viewId;
+    currentViewDbAddress.value = viewDb.address.toString();
 
-  // Optional: A message from the sharer
-  message?: string;
+    if (currentViewDbAddress.value) {
+      navigator.clipboard.writeText(currentViewDbAddress.value)
+        .then(() => alert(`View '${currentViewName.value}' saved! DB Address copied: ${currentViewDbAddress.value}`))
+        .catch(err => alert(`View '${currentViewName.value}' saved! DB Address: ${currentViewDbAddress.value} (copy manually)`));
+    } else {
+       alert(`View '${currentViewName.value}' saved! (Could not get DB address for clipboard)`);
+    }
 
-  // Status (e.g., pending, accepted, revoked by owner) - Advanced
-  // status: 'pending' | 'active' | 'revoked';
+  } catch (error) { console.error("Error saving view:", error); alert("Failed to save. See console."); }
+  finally { savingView.value = false; }
 }
 
-This "SharedViewLink" object would then be accessible by the recipientDid, allowing their Gridable client
-to discover and load the originalViewOrbitDBAddress. The ownerDid would also have a list of these links
-to manage who they've shared views with.
-*/
+async function getLoadedViewDefinitionForTimestamp(dbAddress: string | null): Promise<ViewDefinition | null> {
+    if (!dbAddress) return null;
+    try {
+        const db = await getDocumentStoreDatabase(dbAddress);
+        const docs = await db.all();
+        return (docs.length > 0 ? docs[0] : null) as ViewDefinition | null;
+    } catch (error) { console.error("Error fetching view for timestamp:", error); return null; }
+}
+
+// --- Load View Logic ---
+function handleLoadView() { loadViewDialog.value = true; }
+
+async function confirmLoadView() {
+  if (!viewAddressToLoad.value) { alert("Please enter a view OrbitDB address."); return; }
+  loadingView.value = true; loadViewDialog.value = false;
+  try {
+    const db = await getDocumentStoreDatabase(viewAddressToLoad.value);
+    const results = await db.all();
+
+    if (results && results.length > 0) {
+      const loadedDef = results[0] as ViewDefinition;
+
+      currentViewName.value = loadedDef.viewName;
+      currentViewId.value = loadedDef._id || loadedDef.viewId;
+      currentViewDbAddress.value = viewAddressToLoad.value;
+
+      await loadUserTables(true); // Ensure availableTablesInternal is populated before mapping
+
+      designedTables.value = loadedDef.tables.map(t => {
+        const originalTableMeta = availableTablesInternal.value.find(at => at.tableId === t.tableId);
+        return {
+          id: t.tableId, name: t.name,
+          fields: originalTableMeta?.schemaDefinition.map(f => ({name: f.name, type: f.type})) || [],
+          x: t.x, y: t.y,
+          orbitDBAddress: t.orbitDBAddress,
+          originalMetadata: originalTableMeta
+        };
+      });
+      tableCounter = designedTables.value.length;
+      criteriaGridRowData.value = loadedDef.criteria.map(c => ({...c}));
+      alert(`View '${loadedDef.viewName}' loaded!`);
+    } else { alert("Could not find view at address."); }
+  } catch (error) { console.error("Error loading view:", error); alert("Failed to load view."); }
+  finally { loadingView.value = false; viewAddressToLoad.value = ''; }
+}
+
+function getFieldIcon(fieldType: string): string { switch (fieldType?.toLowerCase()) { case 'string': return 'mdi-format-text'; case 'number': return 'mdi-numeric'; case 'boolean': return 'mdi-toggle-switch-outline'; case 'date': return 'mdi-calendar'; default: return 'mdi-help-circle-outline'; } }
 
 </script>
 
 <style scoped>
-.view-editor-container {
-  height: calc(100vh - 64px); /* Adjust based on actual header height */
-  display: flex;
-  flex-direction: column;
-}
+.view-editor-container { height: calc(100vh - 64px); display: flex; flex-direction: column; }
 .editor-panes { flex-grow: 1; min-height: 300px; }
-.tables-pane .v-card, .design-surface-pane .v-card { display: flex; flex-direction: column; height: 100%; }
-.tables-pane .v-card-text, .design-surface-pane .v-card-text { flex-grow: 1; overflow-y: auto; }
-.design-surface { position: relative; border: 1px dashed #ccc; background-color: #f9f9f9; min-height: 250px; }
-.designed-table-representation { position: absolute; background-color: white; border: 1px solid #aeaeae; border-radius: 4px; padding: 8px; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); cursor: grab; }
-.designed-table-representation ul { list-style-type: none; padding-left: 0; margin-top: 5px; font-size: 0.9em; }
-.designed-table-representation ul li { padding: 2px 0; border-bottom: 1px dotted #eee; }
-.designed-table-representation ul li:last-child { border-bottom: none; }
+.design-surface { position: relative; border: 1px dashed #ccc; min-height: 400px; overflow: hidden; }
+.designed-table-representation { position: absolute; background-color: white; border: 1px solid #aeaeae; padding: 10px; width: 220px; user-select: none; }
+.designed-table-representation strong { display: block; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+.designed-table-representation ul.field-list { list-style-type: none; padding-left: 0; margin-top: 5px; font-size: 0.9em; max-height: 150px; overflow-y: auto;}
+.designed-table-representation ul.field-list li { padding: 3px 0; display: flex; align-items: center;}
 .fill-height { height: 100%; }
 </style>
