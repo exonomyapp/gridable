@@ -137,4 +137,15 @@ This phase will focus on building out the core functionalities, making the place
 - [ ] **10. Gridable Configuration Storage:**
   - [ ] Use OrbitDB to store all internal configurations of Gridable itself (e.g., list of known tables, user-created views, themes, sharing links, etc.), associated with the user's DID.
 
+### E. Componentization & Reusability (New)
+
+- [ ] **1. Package GridableGrid as an NPM Module (`upGrid`):**
+  - [ ] Refactor `GridableGrid.vue` and its dependencies (like `GridableGridTheme.ts`, and potentially some base types) into a structure suitable for publishing as an independent npm package.
+  - [ ] Define a clear public API for `upGrid`.
+  - [ ] Set up a separate build process for the `upGrid` package (e.g., using Vite library mode or similar).
+  - [ ] Implement comprehensive unit and integration tests for `upGrid`.
+  - [ ] Publish `upGrid` to npm (initially as a private package if desired, or public).
+  - [ ] **Integrate `upGrid` back into the main Gridable project**: Replace the local `components/core/GridableGrid.vue` with the imported `upGrid` package from npm.
+  - [ ] Establish a workflow for developing and versioning `upGrid` alongside or independently of the main Gridable application.
+
 This detailed plan provides a roadmap for transforming the current foundational application into the full-featured Gridable platform.
