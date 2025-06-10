@@ -81,7 +81,7 @@ This phase will focus on building out the core functionalities, making the place
   - [x] Implement robust column reordering (drag & drop) with persistence.
   - [x] Implement basic advanced filtering (per column, text/number) with persistence.
   - [x] Implement column visibility toggle with persistence.
-  - [ ] Implement row selection (single, multiple) with programmatic access.
+  - [x] Implement row selection (single, multiple) with programmatic access. (Implemented single, multiple modes with Ctrl/Cmd+click toggle, Shift+click range selection. Exposed methods for get/set/clear selection.)
   - [ ] Implement inline cell editing for data in tables (OrbitDB backend).
   - [ ] Investigate and implement strategies for handling large datasets (e.g., virtual scrolling, data windowing if OrbitDB supports it efficiently).
   - [ ] Support custom cell renderers (e.g., for displaying images, links, or custom Vue components within cells). (Basic checkbox renderer implemented).
