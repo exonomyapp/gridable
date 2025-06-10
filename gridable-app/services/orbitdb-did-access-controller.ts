@@ -11,11 +11,15 @@ interface AccessControllerOptions {
 
 /**
  * Custom DID Access Controller for OrbitDB.
- * Grants write access based on a list of authorized DIDs and verifies
- * entry signatures using the CustomDIDIdentityProvider.
+ *
+ * This controller grants write access based on a list of authorized DIDs, which are
+ * provided during database creation via the `options.write` array. These DIDs are
+ * stored in the `writeAccess` set.
+ * It then verifies entry signatures using the `CustomDIDIdentityProvider` and a
+ * provided `verificationFunction` to ensure the authenticity of the writer's DID.
  */
 export class CustomDIDAccessController {
-  private writeAccess: Set<string>;
+  private writeAccess: Set<string>; // Set of DIDs explicitly granted write access
   private adminAccess: Set<string>;
   private verificationFunction: DidVerificationFunction;
   private orbitdb: any; // OrbitDB instance, passed for context if needed by underlying systems
@@ -39,60 +43,72 @@ export class CustomDIDAccessController {
 
   /**
    * Determines if an identity (DID) can append an entry to the database.
-   * This is the core method called by OrbitDB.
-   * @param entry The OrbitDB log entry to be appended.
-   * @param identityProvider The identity provider instance that can verify signatures.
-   * @returns A Promise that resolves to true if access is granted, false otherwise.
+   * This is the core method called by OrbitDB when an entry is to be added.
+   *
+   * The process involves two main checks:
+   * 1.  **Authorization**: Is the writer's DID (extracted from `entry.identity.id`)
+   *     present in the `this.writeAccess` set? This set is initialized from the
+   *     `options.write` array provided when the database access controller was configured.
+   * 2.  **Authentication**: Is the signature on the entry (`entry.sig`) valid for the
+   *     writer's claimed DID and the entry's data (hash)? This is verified using
+   *     `CustomDIDIdentityProvider.verifyIdentity` and the `this.verificationFunction`.
+   *
+   * Both checks must pass for write access to be granted.
+   *
+   * @param entry The OrbitDB log entry to be appended. It includes identity, signature, and payload.
+   * @param identityProvider The identity provider instance (e.g., `CustomDIDIdentityProvider`)
+   *                         that OrbitDB uses, which helps in interpreting the entry's identity.
+   * @returns A Promise that resolves to `true` if access is granted, `false` otherwise.
    */
   async canAppend(entry: any, identityProvider: CustomDIDIdentityProvider): Promise<boolean> {
     console.log("[DID_AC] canAppend called. Entry ID:", entry.id, "Entry Hash:", entry.hash);
-    console.log("[DID_AC] Entry Identity Details:", entry.identity);
+    console.log("[DID_AC] Entry Identity Details:", entry.identity); // Contains { id: writerDID, publicKey, sig: idSignature }
     console.log("[DID_AC] Entry Signature:", entry.sig);
-    // 1. Get the DID of the writer from the entry's identity
-    //    The entry.identity object is created by the identityProvider.getId() and related signing.
-    //    So, entry.identity.id should be the DID string.
+    // Step 1: Extract the writer's DID from the entry's identity.
+    // The `entry.identity.id` field should contain the DID string of the purported writer,
+    // as populated by the CustomDIDIdentityProvider during entry creation.
     const writerDID = entry.identity.id;
     console.log("[DID_AC] Writer DID from entry identity:", writerDID);
     if (!writerDID) {
-      console.warn("CustomDIDAccessController: Writer DID not found in entry identity.");
+      console.warn("[DID_AC] Write DENIED: Writer DID not found in entry identity.");
       return false;
     }
 
-    // 2. Check if the writer's DID is in the allowed write access list
+    // Step 2: Authorization Check.
+    // Verify if the extracted writer's DID is present in the `writeAccess` set.
+    // This set contains DIDs that were explicitly granted write permission when this DB was opened/created.
     if (!this.writeAccess.has(writerDID)) {
-      console.warn(`[DID_AC] Write DENIED: ${writerDID} not in allowed list: ${JSON.stringify(Array.from(this.writeAccess))}`);
-      console.warn(`CustomDIDAccessController: DID ${writerDID} not in write access list for this database.`);
+      console.warn(`[DID_AC] Write DENIED: DID ${writerDID} is not in the allowed writeAccess list: ${JSON.stringify(Array.from(this.writeAccess))}`);
       return false;
     }
 
-    // 3. Verify the signature of the entry
-    //    - entry.sig: The signature of the entry's payload/hash.
-    //    - entry.key: The public key associated with the identity (might be the DID itself or a linked key).
-    //    - entry.payload: The actual data/payload of the entry.
-    //    - entry.hash: The hash of the entry (often what's actually signed).
-    //    The identityProvider's static verifyIdentity method is suitable here.
+    // Step 3: Authentication Check.
+    // Verify the signature of the entry to ensure the writer is authentic and owns the claimed DID.
+    // - `entry.sig`: The signature of the entry's hash (or payload).
+    // - `entry.hash`: The hash of the entry, typically what is signed.
+    // - `this.verificationFunction`: The function (e.g., `mockDidVerificationFunction`) provided during
+    //   AC setup, capable of verifying a signature against a DID and data.
     try {
-      // Data that was signed is typically entry.hash or some canonical form of the entry.
-      // This depends on how OrbitDB structures entries for signing.
-      // Let's assume entry.hash is what needs to be verified against entry.sig using writerDID.
-      // The CustomDIDIdentityProvider's verifyIdentity expects (signature, did, data, verificationFn)
-      const dataToVerify = entry.hash;
+      const dataToVerify = entry.hash; // OrbitDB entries are typically signed over their hash.
       if (!dataToVerify) {
-          console.warn("CustomDIDAccessController: No hash found on entry to verify signature against.");
+          console.warn("[DID_AC] Write DENIED: No hash found on entry to verify signature against.");
           return false;
       }
+      if (!entry.sig) {
+        console.warn("[DID_AC] Write DENIED: No signature found on entry.");
+        return false;
+      }
 
-      console.log(`[DID_AC] Verifying signature: sig=${entry.sig}, did=${writerDID}, data=${dataToVerify}`);
+      console.log(`[DID_AC] Verifying signature: sig=${entry.sig.substring(0,10)}..., did=${writerDID}, dataHash=${dataToVerify.substring(0,10)}...`);
       const isValidSignature = await CustomDIDIdentityProvider.verifyIdentity(
-        entry.sig,          // The signature on the entry
-        writerDID,          // The DID that supposedly signed it
-        dataToVerify,       // The data (hash) that was signed
-        this.verificationFunction // The function to perform DID-specific verification
+        entry.sig,                // The signature from the entry
+        writerDID,                // The DID that supposedly signed the entry
+        dataToVerify,             // The data (hash) that was signed
+        this.verificationFunction // The verification function passed during AC initialization
       );
 
       if (!isValidSignature) {
         console.warn(`[DID_AC] Write DENIED: Signature invalid for DID ${writerDID}.`);
-        console.warn(`CustomDIDAccessController: Invalid signature for DID ${writerDID} on entry.`);
         return false;
       }
     } catch (e) {
