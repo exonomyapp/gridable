@@ -16,9 +16,11 @@ Gridable allows users to manage OrbitDB tables directly and construct complex "V
 
 ## Key Features
 
-*   **Decentralized Database Management:**
-    *   Full CRUD (Create, Read, Update, Delete) operations for OrbitDB tables.
-    *   Schema definition and management for tables.
+*   **Decentralized Database Management & Data Ownership:**
+    *   **DID-Owned Data Tables:** All OrbitDB data tables created within Gridable are owned by and cryptographically associated with the user's DID. This ensures data sovereignty and isolation.
+    *   **User-Scoped Data:** When a user signs in with their DID, they only see and interact with the tables and data they created or have been explicitly granted access to.
+    *   Full CRUD (Create, Read, Update, Delete) operations for these DID-owned OrbitDB tables.
+    *   Schema definition and management for these tables.
 *   **Powerful View Editor:**
     *   Visually design "Views" using a drag-and-drop interface similar to Microsoft Access.
     *   Define relationships (joins) between tables visually.
@@ -37,12 +39,13 @@ Gridable allows users to manage OrbitDB tables directly and construct complex "V
     *   Publish Views (and their underlying data structure) via Helia (IPFS).
     *   Share Views with other users (DIDs) similar to sharing documents in Google Docs.
     *   Control whether Views are shared with or without specific themes, or allow recipients to choose.
-*   **Bi-Level Authentication:**
-    *   **Primary Accounts via DIDs:** Universal Decentralized Identifiers (DIDs) for first-class citizen accounts.
-    *   **Linked Third-Party Authenticators:** Associate multiple third-party authenticators (e.g., Google, GitHub, Supabase, Amazon) to a primary DID in a one-to-many relationship.
-    *   User profiles and settings pages for managing DIDs and linked accounts.
-*   **Configuration Storage:**
-    *   All Gridable configurations (known tables, user-created views, themes, sharing links, etc.) are stored in OrbitDB, associated with the user's DID.
+*   **Authentication & Access Control:**
+    *   **Multiple Primary DID Accounts:** Gridable supports multiple distinct user accounts, each authenticated via their unique Decentralized Identifier (DID).
+    *   **DID-Exclusive Sign-In:** Sign-in to Gridable is *exclusively* handled by DIDs. Users authenticate directly with their DID to access their Gridable environment.
+    *   **Linked Third-Party Authenticators (for External Resources):** While not used for Gridable sign-in, users can link third-party authenticators (e.g., Google, GitHub) to their primary DID. This is intended for Gridable to potentially access or interact with external resources on behalf of the user in the future.
+    *   User profiles and settings pages for managing DIDs and potentially linked authenticators.
+*   **DID-Specific Configuration Storage:**
+    *   All Gridable configurations (definitions of known tables, user-created views, themes, sharing links, etc.) are stored in OrbitDB and are associated with the specific user's DID, ensuring configurations are also isolated per user.
 
 ## Technology Stack
 

@@ -96,14 +96,15 @@ This phase will focus on building out the core functionalities, making the place
 ### B. Decentralization & Security
 
 - [ ] **4. Real DID-Based Authentication:**
-  - [ ] Select and integrate a DID library/protocol suitable for web applications (e.g., Ceramic, Key DID, ION).
-  - [ ] Replace mock authentication in `store/auth.ts` with the chosen DID solution.
-  - [ ] Implement secure key management for DIDs.
+  - [ ] Select and integrate a DID library/protocol suitable for web applications (e.g., Ceramic, Key DID, ION) allowing users to sign in with their own DIDs.
+  - [ ] Replace mock authentication in `store/auth.ts` with the chosen DID solution, supporting multiple distinct user DID accounts.
+  - [ ] Implement secure key management for DIDs (if handled client-side by the chosen solution).
   - [ ] Structure DID authentication using Nuxt 3 layers as initially planned.
   - [ ] Develop DID profile management features (e.g., updating display name, avatar linked to DID).
+  - [ ] Clarify that DIDs are the exclusive mechanism for signing into Gridable; third-party authenticators are for linking external resources, not direct Gridable login.
 
 - [ ] **5. Third-Party Authenticators (via Nuxt Layers):**
-  - [ ] Design and implement the system for linking third-party authentications (Google, GitHub, etc.) to a primary DID.
+  - [ ] Design and implement the system for linking third-party authentications (Google, GitHub, etc.) to *a user's* primary DID. These linked authenticators are *not* for signing into Gridable but for allowing Gridable to potentially access external resources on the user's behalf.
   - [ ] Develop separate Nuxt 3 layers for each major third-party authenticator.
   - [ ] Manage credentials and sessions securely.
   - [ ] Update the Settings page to allow users to connect/disconnect these authenticators.
@@ -144,7 +145,7 @@ This phase will focus on building out the core functionalities, making the place
   - [ ] Manage OrbitDB table properties (e.g., access controllers, replication settings).
 
 - [ ] **10. Gridable Configuration Storage:**
-  - [ ] Use OrbitDB to store all internal configurations of Gridable itself (e.g., list of known tables, user-created views, themes, sharing links, etc.), associated with the user's DID.
+  - [ ] Use OrbitDB to store all user-specific data: this includes actual data tables created by the user, as well as internal configurations of Gridable (e.g., list of known tables, user-created views, themes, sharing links, etc.). All such data and configurations are to be cryptographically associated with the user's DID, ensuring data isolation and sovereignty.
 
 - [ ] **11. GUI for Managing OrbitDB Access Control (NEW):**
     - [ ] Design and implement a user interface for managing Access Controller settings for user-owned OrbitDB databases (e.g., view/table definitions).
