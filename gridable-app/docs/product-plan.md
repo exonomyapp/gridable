@@ -74,7 +74,7 @@ This phase will focus on building out the core functionalities, making the place
     - [~] Implement grouping and aggregation capabilities. (UI for defining 'Group By' and 'Aggregation Function' in criteria grid is complete, including mutual exclusivity. View execution logic for grouping/aggregation is pending).
     - [x] Save the complete view definition (tables, relationships, criteria) to its own OrbitDB store. (Implemented for current feature set).
     - [x] Load existing view definitions from OrbitDB into the editor. (Implemented).
-  - [x] Minimal Viable View Execution (single-table, basic criteria). (Implemented in `pages/execute/view.vue`).
+  - [~] Minimal Viable View Execution. (Implemented in `pages/execute/view.vue` for single-table and basic multi-table INNER JOINs; filtering, G&A, sorting adapted for joined data. More join types and advanced query optimization pending).
 
 - [x] **3. GridableGrid.vue - Advanced AG Grid Features (Key UI interactions implemented):**
   - [x] Implement robust column resizing with persistence.
