@@ -66,8 +66,8 @@ This phase will focus on building out the core functionalities, making the place
 - [x] **2. View Editor - Full Functionality (Core features for single-table views implemented):**
   - [ ] **Visual Design Surface:**
     - [x] Implement drag-and-drop of available OrbitDB tables onto the design surface. (Basic implementation done).
-    - [ ] Enable visual linking (drawing lines) between fields of different tables to define relationships (joins).
-    - [ ] Persist table positions and relationships as part of the view definition. (Positions are saved).
+    - [x] Enable visual linking (drawing lines) between fields of different tables to define relationships (joins). (Basic UI for drawing, selection, and deletion of links implemented; join type definition and execution pending).
+    - [x] Persist table positions and relationships as part of the view definition. (Positions and basic relationship links are saved).
   - [ ] **Criteria Grid & View Definition:**
     - [x] Dynamically populate the criteria grid with fields from tables added to the design surface.
     - [x] Allow users to select fields for output, define aliases, set sorting orders, and specify complex filter criteria (AG Grid-like). (Basic output toggle, alias, sort, filter implemented).
