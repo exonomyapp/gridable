@@ -65,10 +65,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, nextTick } from 'vue';
-import GridableGrid from '~/components/core/GridableGrid.vue';
-import type { GridTheme } from '~/components/core/GridableGridTheme';
+import { GridableGrid } from '@upgrid/core'; // Updated import
+import type { GridTheme } from '@upgrid/core'; // Updated import
 import type { GridState, GlobalAppSettings } from '~/services/userPreferences';
-import { getViewGridState, getGlobalAppSettings, saveViewGridState } from '~/services/userPreferences'; // Added save for direct test
+import { getViewGridState, getGlobalAppSettings, saveViewGridState } from '~/services/userPreferences';
 import { useAuthStore } from '~/store/auth';
 
 // --- Theme ---
@@ -84,7 +84,7 @@ const applyDefaultTheme = () => Object.assign(currentTheme, defaultTheme);
 const sampleColDefs = ref([
   { headerName: 'ID', field: 'id', sortable: true, textAlign: 'center', width: 70, minWidth: 50, filter: 'number', filterParams: { filterType: 'number', condition: 'equals' } },
   { headerName: 'Make', field: 'make', sortable: true, width: 180, minWidth: 100, filter: 'text', filterParams: { filterType: 'text', condition: 'contains' } },
-  { headerName: 'Model', field: 'model', sortable: true, width: 180, minWidth: 100, filter: 'text' }, // Default text filter: contains
+  { headerName: 'Model', field: 'model', sortable: true, width: 180, minWidth: 100, filter: 'text' },
   { headerName: 'Price ($)', field: 'price', sortable: true, textAlign: 'right', width: 120, minWidth: 80, filter: 'number', filterParams: { filterType: 'number', condition: 'greaterThan' } }
 ]);
 const sampleRowData = ref([
@@ -114,7 +114,6 @@ const savedStates = reactive<{ [viewId: string]: GridState }>({});
 
 async function applyAndReloadGrid(viewId: string, newState: GridState) {
   reloadingGrid.value = true;
-  // Create a deep copy for currentInitialGridState to ensure reactivity and no shared refs with other states
   currentInitialGridState[viewId] = JSON.parse(JSON.stringify(newState));
   if (newState.itemsPerPage) {
     userSelectedItemsPerPage.value = newState.itemsPerPage;
@@ -131,7 +130,6 @@ onMounted(async () => {
     globalAppSettings.value = await getGlobalAppSettings();
     if (globalAppSettings.value?.defaultItemsPerPage) {
       userSelectedItemsPerPage.value = globalAppSettings.value.defaultItemsPerPage;
-      // Also update the default initial state's itemsPerPage if not specifically set by loaded state later
       if (currentInitialGridState['sampleGrid1'] && !currentInitialGridState['sampleGrid1'].itemsPerPage) {
           currentInitialGridState['sampleGrid1'].itemsPerPage = userSelectedItemsPerPage.value;
       }
@@ -151,38 +149,35 @@ onMounted(async () => {
       };
       await applyAndReloadGrid('sampleGrid1', mergedState);
     } else {
-      // No saved state, ensure grid initializes with current defaults (which might have been updated by global settings)
       await applyAndReloadGrid('sampleGrid1', { ...(currentInitialGridState['sampleGrid1'] || {itemsPerPage: userSelectedItemsPerPage.value}) });
     }
   }
 });
 
 watch(() => authStore.currentUser?.did, async (newDid) => {
-    if (newDid) { // Simplified re-fetch logic
+    if (newDid) {
         console.log("User changed or became available, (re)loading initial state for sampleGrid1...");
         const loadedState = await getViewGridState("sampleGrid1");
         if (loadedState && Object.keys(loadedState).length > 0) {
             await applyAndReloadGrid('sampleGrid1', loadedState);
         } else {
-            // Reset to a default state if new user has no saved state
             const defaultStateForNewUser: GridState = { itemsPerPage: globalAppSettings.value?.defaultItemsPerPage || 5, filterModel: {}, columnOrder: ['id', 'make', 'model', 'price'], columnVisibility: {'id':true,'make':true,'model':true,'price':true}};
             await applyAndReloadGrid('sampleGrid1', defaultStateForNewUser);
         }
     }
-}, { immediate: false }); // Don't run immediately, onMounted handles initial load
+}, { immediate: false });
 
 function handleGridStateSave(event: { viewId: string, state: GridState }) {
   console.log(`Event 'grid-state-change' for ${event.viewId}:`, event.state);
   savedStates[event.viewId] = JSON.parse(JSON.stringify(event.state));
 }
 
-// --- Simulated State Loading Functions ---
 function loadSimulatedState1() {
   const newState: GridState = {
     itemsPerPage: 3,
     sortState: { field: 'id', direction: 'desc' },
     columnOrder: ['make', 'model', 'id', 'price'],
-    columnVisibility: { 'id': true, 'make': true, 'model': true, 'price': false }, // Price hidden
+    columnVisibility: { 'id': true, 'make': true, 'model': true, 'price': false },
     columnWidths: { 'make': 200, 'model': 200, 'id': 70 },
     filterModel: { 'make': { filterType: 'text', condition: 'contains', filter: 'Ford' } }
   };

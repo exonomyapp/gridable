@@ -1,0 +1,48 @@
+{
+  "name": "upgrid",
+  "version": "0.0.1",
+  "description": "A feature-rich grid component, inspired by AG Grid, for Vue 3.",
+  "main": "dist/upGrid.umd.js",
+  "module": "dist/upGrid.es.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/upGrid.es.js",
+      "require": "./dist/upGrid.umd.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "dev": "echo 'upGrid dev script placeholder'",
+    "build": "echo 'upGrid build script placeholder - e.g., using Vite library mode'",
+    "lint": "echo 'upGrid lint placeholder'"
+  },
+  "keywords": [
+    "vue",
+    "grid",
+    "data-grid",
+    "table",
+    "ag-grid",
+    "upgrid"
+  ],
+  "author": "Gridable Project (via AI Agent Jules)",
+  "license": "MIT",
+  "peerDependencies": {
+    "vue": "^3.0.0",
+    "vuetify": "^3.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^4.0.0",
+    "vue": "^3.0.0",
+    "vuetify": "^3.0.0"
+  },
+  "dependencies": {
+  }
+}
