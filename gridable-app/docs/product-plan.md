@@ -146,6 +146,11 @@ This phase will focus on building out the core functionalities, making the place
 - [ ] **10. Gridable Configuration Storage:**
   - [ ] Use OrbitDB to store all internal configurations of Gridable itself (e.g., list of known tables, user-created views, themes, sharing links, etc.), associated with the user's DID.
 
+- [ ] **11. GUI for Managing OrbitDB Access Control (NEW):**
+    - [ ] Design and implement a user interface for managing Access Controller settings for user-owned OrbitDB databases (e.g., view/table definitions).
+    - [ ] Allow users to view current permissions (e.g., who has write access - typically just themselves for private DBs initially).
+    - [ ] For databases intended for sharing, provide functionality to grant or revoke write/read access to other DIDs (this ties into the "View Sharing & Collaboration" features).
+
 ### E. Componentization & Reusability (New)
 
 - [ ] **1. Package GridableGrid as an NPM Module (`upGrid`):**
