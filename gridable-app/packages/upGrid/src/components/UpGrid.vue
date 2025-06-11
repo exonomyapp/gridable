@@ -100,7 +100,9 @@
             :class="{ 'cell-editable': colDef.editable && !(editingCell && editingCell.rowId === (props.rowIdField ? row[props.rowIdField] : undefined) && editingCell.field === colDef.field) }"
             @dblclick="handleCellDblClick(row, colDef)"
           >
-            <!-- Conditional rendering for inline editing: show input if cell is active, otherwise show standard content -->
+            <!-- Conditional rendering for inline editing:
+                 Show input if this cell (matching rowId and field) is the `editingCell`.
+                 Otherwise, show standard cell content (text or custom renderer like checkbox). -->
             <template v-if="editingCell && (props.rowIdField && editingCell.rowId === row[props.rowIdField]) && editingCell.field === colDef.field">
               <input
                 type="text"
@@ -193,12 +195,21 @@ const props = defineProps({
  *     - `viewId`: The ID of the view associated with this grid instance.
  *     - `state`: An object representing the current comprehensive state of the grid.
  *
- * @emits cell-value-changed - Fired when the value of a cell is changed, typically through an interactive cell renderer like a checkbox.
- *   Payload: `{ row: RowDataItem, field: string, newValue: any, originalRowIndex: number }`
- *     - `row`: The data object for the row that was changed.
- *     - `field`: The field (property key) of the cell that was changed.
- *     - `newValue`: The new value of the cell.
- *     - `originalRowIndex`: The index of the row in the original `rowData` array (before pagination/filtering/sorting).
+ * @emits cell-value-changed - Fired when the value of a cell is changed.
+ *   For checkbox changes (via `setCellValue`):
+ *     Payload: `{ row: RowDataItem, field: string, newValue: any, originalRowIndex: number }`
+ *       - `row`: The data object for the row that was changed (mutated directly for checkboxes).
+ *       - `field`: The field (property key) of the cell that was changed.
+ *       - `newValue`: The new value of the cell.
+ *       - `originalRowIndex`: The index of the row in the original `rowData` array (before pagination/filtering/sorting).
+ *   For inline text edits (via `saveEdit` from Enter/Blur):
+ *     Payload: `{ rowId: string | number, field: string, oldValue: any, newValue: any, rowData: RowDataItem, originalRowIndex: number }`
+ *       - `rowId`: The unique ID of the row that was changed (from `props.rowIdField`).
+ *       - `field`: The field (property key) of the cell that was changed.
+ *       - `oldValue`: The original value of the cell before editing.
+ *       - `newValue`: The new value entered by the user.
+ *       - `rowData`: A reference to the original row data object from `props.rowData`. The parent component is responsible for applying the update.
+ *       - `originalRowIndex`: The index of the row in the original `rowData` array.
  *
  * @emits selectionChanged - Fired whenever the set of selected rows changes, either through user interaction or programmatic calls.
  *   Payload: `{ selectedIds: Set<string | number>, selectedData: RowDataItem[] }`
@@ -330,6 +341,8 @@ function sortData(field: string) {
   notifyGridStateChange();
 }
 
+// --- Inline Editing ---
+
 /**
  * Handles the double-click event on a data cell to initiate inline editing.
  * - Checks if the column definition (`colDef`) allows editing (`colDef.editable === true`).
@@ -388,7 +401,16 @@ function notifyGridStateChange() {
   }
 }
 
-
+/**
+ * Saves the currently edited cell's value.
+ * - Retrieves `rowId` and `field` from `editingCell.value`.
+ * - Finds the original row data using `rowId`.
+ * - Compares the `editingCellValue.value` (new value) with the original cell value.
+ * - If the value has changed, emits a `cell-value-changed` event with the payload:
+ *   `{ rowId, field, oldValue, newValue, rowData (original row object), originalRowIndex }`.
+ *   The parent component is responsible for updating the actual `props.rowData`.
+ * - Clears `editingCell` and `editingCellValue` to exit edit mode.
+ */
 function saveEdit() {
   if (!editingCell.value) return;
 
@@ -424,19 +446,37 @@ function saveEdit() {
   editingCellValue.value = null;
 }
 
+/**
+ * Cancels the current inline editing operation.
+ * - Discards any changes made in the input field.
+ * - Clears `editingCell` and `editingCellValue` to exit edit mode.
+ */
 function cancelEdit() {
   editingCell.value = null;
   editingCellValue.value = null;
 }
 
+/**
+ * Handles the 'Enter' key press within the editing input.
+ * Calls `saveEdit()` to finalize the edit.
+ */
 function handleEditEnter() {
   saveEdit();
 }
 
+/**
+ * Handles the 'Escape' key press within the editing input.
+ * Calls `cancelEdit()` to discard changes and exit edit mode.
+ */
 function handleEditEscape() {
   cancelEdit();
 }
 
+/**
+ * Handles the 'blur' event (losing focus) on the editing input.
+ * Calls `saveEdit()` to finalize the edit, which is a common behavior for inline editors.
+ * `saveEdit` itself will only emit an event if the value actually changed.
+ */
 function handleEditBlur() {
   // Save on blur, as is common behavior. saveEdit() will only emit if value changed.
   saveEdit();
