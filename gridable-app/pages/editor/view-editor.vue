@@ -196,15 +196,40 @@ const authStore = useAuthStore();
 const route = useRoute();
 
 // --- Interfaces ---
+// Overall View Editor component allows users to visually design database views.
+// Key functionalities include:
+// - Displaying available data tables.
+// - Allowing users to drag tables onto a design surface.
+// - Enabling users to draw visual relationship lines (joins) between fields of these tables.
+// - Providing a criteria grid to specify output fields, aliases, sorting, filtering.
+// - Saving and loading these view definitions to/from OrbitDB.
+
 interface DesignedTableField { name: string; type: string; }
 interface DesignedTableDisplay { id: string; name: string; fields: DesignedTableField[]; x: number; y: number; originalMetadata?: TableMetadata; orbitDBAddress?: string; }
 interface ViewTableReference { tableId: string; orbitDBAddress: string; name: string; alias?: string; x: number; y: number; }
-interface CriteriaRow { field: string; table: string; alias?: string; output: boolean; sort?: 'asc' | 'desc' | ''; filter?: string; group?: boolean; }
+/**
+ * @interface CriteriaRow
+ * Defines the structure for a row in the criteria grid. Each row corresponds to a field
+ * from a table on the design surface and specifies how it should be handled in the view.
+ * @property {string} field - The name of the field.
+ * @property {string} table - The name of the table this field belongs to.
+ * @property {string} [alias] - Optional alias for the field in the view's output.
+ * @property {boolean} output - Whether to include this field in the view's output.
+ * @property {'asc' | 'desc' | ''} [sort] - Sort direction for this field, or empty if no sort.
+ * @property {string} [filter] - Filter condition string for this field.
+ * @property {boolean} [group] - If true, this field is used for grouping. When true,
+ *                               `aggregationFunction` should typically be empty or disabled.
+ * @property {'SUM' | 'AVG' | 'COUNT' | 'MIN' | 'MAX' | ''} [aggregationFunction] - Optional aggregation
+ *                               function (e.g., SUM, AVG, COUNT) for this field. If an aggregation
+ *                               function is selected, `group` should typically be false for this field.
+ */
+interface CriteriaRow { field: string; table: string; alias?: string; output: boolean; sort?: 'asc' | 'desc' | ''; filter?: string; group?: boolean; aggregationFunction?: 'SUM' | 'AVG' | 'COUNT' | 'MIN' | 'MAX' | ''; }
 
 /**
  * @interface Relationship
- * Defines the structure for a visual relationship between two table fields.
- * @property {string} id - Unique identifier for the relationship.
+ * Defines the structure for a visual relationship (join) between two table fields.
+ * This structure is stored as part of the ViewDefinition.
+ * @property {string} id - Unique identifier for this specific relationship link.
  * @property {string} sourceTableId - The ID of the source table.
  * @property {string} sourceFieldId - The name/ID of the source field.
  * @property {string} targetTableId - The ID of the target table.
@@ -298,33 +323,68 @@ const draggedTableIndex = ref(-1);
 // --- Line Drawing & Relationship Management State ---
 // This section manages the UI and state for creating, displaying, and deleting visual table relationships.
 // The overall flow is:
-// 1. User mousedowns on a 'field-port' of a table.
-// 2. `handlePortMouseDown` initiates drawing mode (`isDrawingLine = true`), records the source port.
-// 3. Global mousemove (`handleGlobalMouseMove`) updates the end coordinates of a temporary line.
-// 4. Global mouseup (`handleGlobalMouseUp`) finalizes the line:
-//    - If dropped on a valid target port, a `Relationship` object is created and added to `drawnRelationships`.
-//    - Drawing mode is reset.
-// 5. The `linesToRender` computed property calculates screen coordinates for all relationships in `drawnRelationships`.
-// 6. An SVG overlay renders these lines. Lines can be clicked (`handleRelationshipLineClick`) to select them.
-// 7. Selected lines can be deleted using the Delete/Backspace key (`handleDeleteKey`).
+// 1. User mousedowns on a 'field-port' of a table (`handlePortMouseDown`).
+// 2. This initiates drawing mode (`isDrawingLine = true`) and records the source port details.
+// 3. Global mousemove events (`handleGlobalMouseMove`) update the end coordinates of a temporary line being drawn.
+// 4. A global mouseup event (`handleGlobalMouseUp`) finalizes the line drawing:
+//    - If the mouse is released over a valid target field port, a `Relationship` object is created.
+//    - This new relationship is added to the `drawnRelationships` array.
+//    - Drawing mode is then reset.
+// 5. The `linesToRender` computed property dynamically calculates the screen coordinates for all
+//    relationships stored in `drawnRelationships`, ensuring lines connect correctly even if tables are moved.
+// 6. An SVG overlay on the design surface renders these lines.
+// 7. Lines can be clicked (`handleRelationshipLineClick`) to select them, which highlights them visually.
+// 8. A selected line can be deleted by pressing the 'Delete' or 'Backspace' key (`handleDeleteKey`).
 
-/** Indicates if a relationship line is currently being drawn by the user. */
+/**
+ * @ref isDrawingLine
+ * Boolean flag indicating if a relationship line is currently being drawn by the user.
+ */
 const isDrawingLine = ref(false);
 
-/** Stores information about the source port (table ID, field ID, and initial screen coordinates) when a line drawing starts. */
+/**
+ * @interface LinePortInfo
+ * Structure to hold information about the source port when initiating a line draw.
+ * @property {string} tableId - ID of the table containing the source field.
+ * @property {string} fieldId - Name/ID of the source field.
+ * @property {number} x - Initial x-coordinate of the port relative to the design surface.
+ * @property {number} y - Initial y-coordinate of the port relative to the design surface.
+ */
 interface LinePortInfo { tableId: string; fieldId: string; x: number; y: number; }
+/**
+ * @ref lineSource
+ * Stores information about the source port (table ID, field ID, and initial screen coordinates)
+ * when a line drawing operation begins. Null if no line is being drawn.
+ */
 const lineSource = ref<LinePortInfo | null>(null);
 
-/** Stores the screen coordinates (relative to the SVG canvas) of the source port for the line currently being drawn. */
+/**
+ * @ref lineSourceCoords
+ * Stores the screen coordinates (x, y), relative to the SVG canvas (design surface),
+ * of the source port for the line currently being drawn. Used for rendering the temporary line.
+ */
 const lineSourceCoords = ref<{x: number, y: number} | null>(null);
 
-/** Stores the current mouse coordinates (relative to the SVG canvas) for the end point of the line being drawn. */
+/**
+ * @ref currentLineEnd
+ * Stores the current mouse coordinates (x, y), relative to the SVG canvas (design surface),
+ * for the dynamic end point of the line being drawn. Updated on mousemove.
+ */
 const currentLineEnd = ref<{ x: number, y: number } | null>(null);
 
-/** Array holding all successfully drawn (and loaded) Relationship objects. This is persisted with the view definition. */
+/**
+ * @ref drawnRelationships
+ * An array holding all successfully created (and loaded from saved view definitions)
+ * `Relationship` objects. This array is the source of truth for persisted relationships
+ * and is used by `linesToRender` to display them.
+ */
 const drawnRelationships = ref<Relationship[]>([]);
 
-/** Stores the ID of the currently selected relationship line, or null if no line is selected. Used for deletion and visual highlighting. */
+/**
+ * @ref selectedRelationshipId
+ * Stores the unique ID of the currently selected relationship line.
+ * Null if no line is selected. Used for highlighting the selected line and for deletion.
+ */
 const selectedRelationshipId = ref<string | null>(null);
 
 function handleTableDragStart(event: DragEvent, table: DesignedTableDisplay, index: number) {
@@ -368,11 +428,110 @@ function handleTableDragEnd(event: DragEvent) {
   draggedTable.value = null;
   draggedTableIndex.value = -1;
 }
-const addTableToDesign = (table: any) => { if (!designedTables.value.find(t => t.id === table.id)) { designedTables.value.push({ ...table, orbitDBAddress: table.originalMetadata?.orbitDBAddress, x: (tableCounter % 3) * 240 + 20, y: Math.floor(tableCounter / 3) * 180 + 20 }); tableCounter++; table.fields.forEach((field:any) => { if (!criteriaGridRowData.value.find(r => r.field === field.name && r.table === table.name)) { criteriaGridRowData.value.push({ field: field.name, table: table.name, output: true, sort: '', filter: '', group: false, alias: '' }); } }); } };
+const addTableToDesign = (table: any) => {
+  if (!designedTables.value.find(t => t.id === table.id)) {
+    designedTables.value.push({
+      ...table,
+      orbitDBAddress: table.originalMetadata?.orbitDBAddress,
+      x: (tableCounter % 3) * 240 + 20,
+      y: Math.floor(tableCounter / 3) * 180 + 20
+    });
+    tableCounter++;
+    table.fields.forEach((field:any) => {
+      if (!criteriaGridRowData.value.find(r => r.field === field.name && r.table === table.name)) {
+        criteriaGridRowData.value.push({
+          field: field.name,
+          table: table.name,
+          output: true,
+          sort: '',
+          filter: '',
+          group: false, // Initialize 'group' to false
+          alias: '',
+          aggregationFunction: '' // Initialize 'aggregationFunction' to empty
+        });
+      }
+    });
+  }
+};
 
-const criteriaGridColDefs = ref([ { headerName: 'Output', field: 'output', cellRenderer: 'checkbox', width:100 }, { headerName: 'Field', field: 'field' }, { headerName: 'Table', field: 'table' }, { headerName: 'Alias', field: 'alias', editable: true }, { headerName: 'Sort', field: 'sort', width:120 }, { headerName: 'Filter', field: 'filter', editable: true }, { headerName: 'Group By', field: 'group', cellRenderer: 'checkbox', width:100 } ]);
+const aggregationOptions = ['', 'SUM', 'AVG', 'COUNT', 'MIN', 'MAX'];
+
+const criteriaGridColDefs = ref([
+  { headerName: 'Output', field: 'output', cellRenderer: 'checkbox', width:100 },
+  { headerName: 'Field', field: 'field' },
+  { headerName: 'Table', field: 'table' },
+  { headerName: 'Alias', field: 'alias', editable: true },
+  { headerName: 'Sort', field: 'sort', width:120, editable: true, cellEditor: 'select', cellEditorParams: { values: ['', 'asc', 'desc'] } },
+  { headerName: 'Filter', field: 'filter', editable: true },
+  { headerName: 'Group By', field: 'group', cellRenderer: 'checkbox', width:100 },
+  {
+    headerName: 'Aggregate', // Column for selecting aggregation function
+    field: 'aggregationFunction',
+    // The 'editable' property is a function that determines if the cell can be edited.
+    // In this case, the aggregation function dropdown is disabled if 'group' is true for the row.
+    editable: (params: any) => !params.data.group,
+    cellEditor: 'select', // Specifies that GridableGrid should use a select/dropdown type editor.
+    cellEditorParams: { // Parameters for the select editor.
+      values: aggregationOptions // Provides the list of choices for the dropdown.
+    },
+    width: 130
+  }
+]);
 const criteriaGridRowData = ref<CriteriaRow[]>([]);
-function handleCriteriaGridChange(event: any) { /* ... */ }
+
+/**
+ * Handles the `cell-value-changed` event emitted by the `GridableGrid` component
+ * when a cell in the criteria grid is edited.
+ * This function is responsible for updating the `criteriaGridRowData` when users modify
+ * values in columns like 'Alias', 'Sort', 'Filter', or the 'Aggregate' (aggregationFunction) column.
+ *
+ * For checkbox columns ('Output', 'Group By'), `GridableGrid` is expected to directly
+ * modify the corresponding boolean property in the `CriteriaRow` object due to Vue's
+ * reactivity and how its 'checkbox' cell renderer likely works (e.g., v-model or direct mutation).
+ * However, if a checkbox change also triggers this event, the mutual exclusivity logic here will
+ * still apply correctly.
+ *
+ * **Mutual Exclusivity Logic:**
+ * - If a field is marked for 'Group By' (`group: true`), its `aggregationFunction` is automatically cleared.
+ * - If an `aggregationFunction` (e.g., 'SUM', 'AVG') is selected for a field, its `group` status is set to `false`.
+ *   This ensures a field is either used for grouping or for aggregation, not both.
+ *
+ * @param {object} event - The event object emitted by `GridableGrid`.
+ * @param {CriteriaRow} event.data - The data object for the row that was changed.
+ * @param {keyof CriteriaRow} event.field - The field (property name) of the `CriteriaRow` that was changed.
+ * @param {any} event.newValue - The new value for the changed field.
+ */
+function handleCriteriaGridChange(event: { data: CriteriaRow, field: keyof CriteriaRow, newValue: any }) {
+  const { data: rowData, field, newValue } = event;
+
+  const rowIndex = criteriaGridRowData.value.findIndex(r => r === rowData);
+
+  if (rowIndex !== -1) {
+    // Create a copy of the row to modify, to ensure reactivity if GridableGrid doesn't deeply update.
+    const updatedRow = { ...criteriaGridRowData.value[rowIndex] };
+
+    // Update the specific field that changed.
+    (updatedRow as any)[field] = newValue;
+
+    // Enforce mutual exclusivity between 'group' and 'aggregationFunction'.
+    if (field === 'group' && newValue === true) {
+      // If 'group' is checked (true), clear any aggregation function.
+      updatedRow.aggregationFunction = '';
+    } else if (field === 'aggregationFunction' && newValue && newValue !== '') {
+      // If an aggregation function is selected (and it's not the empty/none option),
+      // then 'group' must be false.
+      updatedRow.group = false;
+    }
+
+    // Replace the old row object with the updated one in the criteriaGridRowData array.
+    // This ensures Vue's reactivity picks up the change.
+    criteriaGridRowData.value.splice(rowIndex, 1, updatedRow);
+
+    console.log(`Criteria grid cell for field '${updatedRow.field}' (table: ${updatedRow.table}), column '${field}' updated to:`, newValue, "Full row state:", updatedRow);
+  } else {
+    console.warn("Could not find the row to update in handleCriteriaGridChange. Event data:", rowData);
+  }
+}
 
 async function handleSaveView() {
   if (!authStore.currentUser?.did || !currentViewName.value) { alert("User not authenticated or view name is missing."); return; }
@@ -448,6 +607,10 @@ const getPortElement = (tableId: string, fieldId: string): HTMLElement | null =>
  * Calculates the precise center coordinates of a field's connection port relative to the design surface.
  * This is essential for accurately drawing SVG lines that connect to these ports,
  * especially when tables are moved or the view is scrolled.
+ * It finds the DOM element for the table, then the specific field port within it using data attributes.
+ * `getBoundingClientRect()` is used for both the design surface and the port to get their
+ * positions relative to the viewport, allowing calculation of the port's center relative
+ * to the design surface's top-left corner.
  *
  * @param {string} tableId - The ID of the table containing the field.
  * @param {string} fieldName - The name of the field (used as its ID within the port's data attributes).
@@ -455,62 +618,59 @@ const getPortElement = (tableId: string, fieldId: string): HTMLElement | null =>
  *                                            to the design surface, or null if the port or surface cannot be found.
  */
 const calculatePortCenter = (tableId: string, fieldName: string): { x: number, y: number } | null => {
-  if (!designSurfaceRef.value) return null; // Ensure design surface ref is available
+  if (!designSurfaceRef.value) return null;
 
-  // Construct the DOM ID for the table element and find the specific port element within it.
-  // Field ports are identified by data attributes `data-table-id` and `data-field-name`.
   const portEl = getPortElement(tableId, fieldName);
   if (!portEl) {
-    // console.warn(`Port element not found for table ${tableId}, field ${fieldName}`);
     return null;
   }
 
-  // Get the bounding rectangles of the design surface and the port.
-  // These provide position and size information relative to the viewport.
   const surfaceRect = designSurfaceRef.value.getBoundingClientRect();
   const portRect = portEl.getBoundingClientRect();
 
-  // Calculate the center of the port.
-  // Then, adjust these coordinates to be relative to the design surface's top-left corner.
   const x = portRect.left + portRect.width / 2 - surfaceRect.left;
   const y = portRect.top + portRect.height / 2 - surfaceRect.top;
   return { x, y };
 };
 
 /**
- * A computed property that transforms the `drawnRelationships` data into a format suitable for rendering SVG lines.
- * For each relationship, it calculates the current screen coordinates of its source and target field ports
- * using `calculatePortCenter`. This ensures lines dynamically update when tables are moved.
- * It filters out any relationships for which port coordinates couldn't be determined (e.g., if a table/field was removed).
- *
- * The lines also include an 'id' for keying in v-for and for click handling to select/deselect lines.
- * An invisible wider line is rendered first for each relationship to improve clickability, followed by the visible line.
- * The visible line's appearance (stroke, stroke-width) changes if it's selected.
+ * @computed linesToRender
+ * A computed property that transforms the `drawnRelationships` data (which stores the logical
+ * relationships with table/field IDs) into an array of objects suitable for rendering SVG `<line>` elements.
+ * For each relationship, it calculates the current screen coordinates (x1, y1, x2, y2) of its
+ * source and target field ports using `calculatePortCenter`. This ensures lines dynamically
+ * update their positions when tables are moved on the design surface.
+ * It filters out any relationships for which port coordinates couldn't be determined (e.g., if a
+ * table or field was somehow removed or not yet rendered).
+ * Each object in the returned array includes the relationship's `id` for keying in `v-for`
+ * and for handling click events on the lines (for selection).
  */
 const linesToRender = computed(() => {
   return drawnRelationships.value.map(rel => {
     const sourcePos = calculatePortCenter(rel.sourceTableId, rel.sourceFieldId);
     const targetPos = calculatePortCenter(rel.targetTableId, rel.targetFieldId);
     if (sourcePos && targetPos) {
-      // Return all necessary info for rendering, including original relationship ID
       return { id: rel.id, x1: sourcePos.x, y1: sourcePos.y, x2: targetPos.x, y2: targetPos.y };
     }
-    return null; // If any port cannot be found, this relationship won't be rendered.
+    return null;
   }).filter(line => line !== null) as { id: string, x1: number, y1: number, x2: number, y2: number }[];
 });
 
 
 /**
- * Handles the mousedown event on a field port to initiate line drawing for a new relationship.
- * - Sets `isDrawingLine` to true.
- * - Records the source port's table ID, field ID, and initial screen coordinates.
- * - Sets up global mousemove and mouseup listeners on the document to track the mouse
- *   and finalize or cancel the line drawing.
- * - Deselects any currently selected relationship line.
+ * Handles the `mousedown` event on a field's connection port.
+ * This action initiates the process of drawing a new relationship line.
+ * - Sets the `isDrawingLine` flag to true.
+ * - Records the source table ID, field ID, and the precise starting coordinates of the line
+ *   (center of the clicked port) in `lineSource` and `lineSourceCoords`.
+ * - Sets `currentLineEnd` to the same starting coordinates for the initial render of the temporary line.
+ * - Adds global `mousemove` and `mouseup` event listeners to the document to track mouse
+ *   movement for drawing the line and to finalize or cancel the line when the mouse button is released.
+ * - Deselects any currently selected relationship line to ensure focus is on the new line being drawn.
  *
- * @param {MouseEvent} event - The mousedown event.
- * @param {DesignedTableDisplay} table - The table object containing the source field.
- * @param {DesignedTableField} field - The field object that is the source of the new line.
+ * @param {MouseEvent} event - The mousedown event object.
+ * @param {DesignedTableDisplay} table - The table data object from which the line is being drawn.
+ * @param {DesignedTableField} field - The field data object from which the line is being drawn.
  */
 const handlePortMouseDown = (event: MouseEvent, table: DesignedTableDisplay, field: DesignedTableField) => {
   event.preventDefault();
@@ -534,10 +694,12 @@ const handlePortMouseDown = (event: MouseEvent, table: DesignedTableDisplay, fie
 };
 
 /**
- * Handles the global mousemove event when a line is being drawn.
- * Updates the `currentLineEnd` coordinates based on the mouse position relative to the design surface.
+ * Handles the global `mousemove` event that occurs while a relationship line is being drawn.
+ * It updates the `currentLineEnd` reactive variable with the current mouse coordinates,
+ * adjusted to be relative to the design surface. This allows the temporary SVG line
+ * to visually follow the cursor.
  *
- * @param {MouseEvent} event - The mousemove event.
+ * @param {MouseEvent} event - The `mousemove` event object.
  */
 const handleGlobalMouseMove = (event: MouseEvent) => {
   if (isDrawingLine.value && designSurfaceRef.value) {
@@ -550,35 +712,42 @@ const handleGlobalMouseMove = (event: MouseEvent) => {
 };
 
 /**
- * Handles the global mouseup event to finalize or cancel line drawing.
- * If the mouse is released over a valid target field port (different table or different field on the same table),
- * a new `Relationship` object is created and added to `drawnRelationships`.
- * Otherwise, the line drawing is cancelled.
- * Resets all drawing-related state variables and removes global mouse listeners.
+ * Handles the global `mouseup` event to finalize or cancel the drawing of a relationship line.
  *
- * @param {MouseEvent} event - The mouseup event.
+ * When the mouse button is released:
+ * 1. It checks if a line was actually being drawn (`isDrawingLine` and `lineSource` are valid).
+ * 2. It identifies the DOM element under the cursor. If it's a valid 'field-port' (`targetPort`),
+ *    it extracts the target table ID and field ID.
+ * 3. **Validation:** It ensures the target port is not the same as the source port.
+ * 4. **Relationship Creation:** If the target is valid, a new `Relationship` object is created
+ *    with a unique ID, and source/target table/field IDs.
+ * 5. **Duplicate Check:** Before adding, it checks if an identical or inverse relationship
+ *    already exists in `drawnRelationships`. If not, the new relationship is added.
+ * 6. **State Reset:** Regardless of whether a relationship was created or the drawing was
+ *    cancelled (e.g., by releasing the mouse over an empty area), it resets all drawing-related
+ *    state variables (`isDrawingLine`, `lineSource`, `currentLineEnd`, `lineSourceCoords`).
+ * 7. **Listener Cleanup:** Removes the global `mousemove` and `mouseup` event listeners from the document.
+ *
+ * @param {MouseEvent} event - The `mouseup` event object.
  */
 const handleGlobalMouseUp = (event: MouseEvent) => {
   if (isDrawingLine.value && lineSource.value) {
     const targetElement = event.target as HTMLElement;
-    // Check if the mouse is released over a '.field-port' element.
     const targetPort = targetElement.classList.contains('field-port') ? targetElement : targetElement.closest('.field-port');
 
     if (targetPort) {
       const targetTableId = targetPort.getAttribute('data-table-id');
       const targetFieldId = targetPort.getAttribute('data-field-name');
 
-      // Ensure target is valid (exists and is not the same as the source port).
       if (targetTableId && targetFieldId &&
           (targetTableId !== lineSource.value.tableId || targetFieldId !== lineSource.value.fieldId)) {
         const newRelationship: Relationship = {
-          id: `rel_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, // Simple unique ID
+          id: `rel_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           sourceTableId: lineSource.value.tableId,
           sourceFieldId: lineSource.value.fieldId,
           targetTableId: targetTableId,
           targetFieldId: targetFieldId,
         };
-        // Prevent adding exact duplicate or inverse duplicate relationships.
         const exists = drawnRelationships.value.some(r =>
             (r.sourceTableId === newRelationship.sourceTableId && r.sourceFieldId === newRelationship.sourceFieldId && r.targetTableId === newRelationship.targetTableId && r.targetFieldId === newRelationship.targetFieldId) ||
             (r.sourceTableId === newRelationship.targetTableId && r.sourceFieldId === newRelationship.targetFieldId && r.targetTableId === newRelationship.sourceTableId && r.targetFieldId === newRelationship.sourceFieldId)
@@ -595,7 +764,6 @@ const handleGlobalMouseUp = (event: MouseEvent) => {
       console.log("Line dropped on non-port area, drawing cancelled.");
     }
   }
-  // Reset drawing state regardless of outcome.
   isDrawingLine.value = false;
   lineSource.value = null;
   lineSourceCoords.value = null;
@@ -605,24 +773,30 @@ const handleGlobalMouseUp = (event: MouseEvent) => {
 };
 
 /**
- * Handles clicks on rendered relationship lines in the SVG.
- * Toggles the selection state of the clicked line. If the clicked line is already selected,
- * it deselects it. Otherwise, it sets it as the `selectedRelationshipId`.
+ * Handles click events on the rendered SVG relationship lines.
+ * It toggles the selection state of the clicked line:
+ * - If the clicked line is already selected, it deselects it (`selectedRelationshipId = null`).
+ * - Otherwise, it sets the clicked line as the currently selected one by updating `selectedRelationshipId`.
+ * This allows the selected line to be visually highlighted and targeted for deletion.
+ * The `@click.stop` modifier on the line group in the template prevents the click from
+ * propagating to the SVG background's deselect handler.
  *
- * @param {string} relationshipId - The ID of the relationship line that was clicked.
+ * @param {string} relationshipId - The ID of the `Relationship` object corresponding to the clicked SVG line.
  */
 const handleRelationshipLineClick = (relationshipId: string) => {
   if (selectedRelationshipId.value === relationshipId) {
-    selectedRelationshipId.value = null; // Toggle deselect
+    selectedRelationshipId.value = null;
   } else {
     selectedRelationshipId.value = relationshipId;
   }
 };
 
 /**
- * Deselects any currently selected relationship line if a click occurs on the
- * background of the SVG canvas (i.e., not on a specific line).
- * @param {MouseEvent} event - The click event on the SVG canvas.
+ * Handles click events directly on the SVG canvas background.
+ * Its purpose is to deselect any currently selected relationship line if the user
+ * clicks on an empty area of the design surface (specifically, the SVG overlay itself).
+ *
+ * @param {MouseEvent} event - The click event object.
  */
 const deselectRelationshipLine = (event: MouseEvent) => {
   if ((event.target as SVGSVGElement)?.classList?.contains('relationship-lines-svg')) {
@@ -631,47 +805,45 @@ const deselectRelationshipLine = (event: MouseEvent) => {
 };
 
 /**
- * Handles keyboard events, specifically looking for 'Delete' or 'Backspace' keys
- * to delete a currently selected relationship line.
- * If a line is selected and one of these keys is pressed, the relationship is removed
- * from the `drawnRelationships` array, and the selection is cleared.
+ * Handles global `keydown` events, specifically listening for the 'Delete' or 'Backspace' keys.
+ * If a relationship line is currently selected (`selectedRelationshipId` is not null) and one of these
+ * keys is pressed, the selected relationship is removed from the `drawnRelationships` array.
+ * `event.preventDefault()` is called to stop default browser actions (like navigating back on Backspace).
+ * After deletion, `selectedRelationshipId` is reset to null.
  *
- * @param {KeyboardEvent} event - The keyboard event.
+ * @param {KeyboardEvent} event - The `keydown` event object.
  */
 const handleDeleteKey = (event: KeyboardEvent) => {
   if (event.key === 'Delete' || event.key === 'Backspace') {
     if (selectedRelationshipId.value) {
-      event.preventDefault(); // Important to prevent browser back navigation on Backspace.
+      event.preventDefault();
       const index = drawnRelationships.value.findIndex(r => r.id === selectedRelationshipId.value);
       if (index !== -1) {
         drawnRelationships.value.splice(index, 1);
         console.log("Deleted relationship:", selectedRelationshipId.value);
       }
-      selectedRelationshipId.value = null; // Deselect after deletion.
+      selectedRelationshipId.value = null;
     }
   }
 };
 
-// Watch for changes in `designedTables` (e.g., when tables are moved).
-// When tables move, their field port coordinates change, so lines need to be re-calculated.
-// The `linesToRender` computed property handles this automatically by re-calling `calculatePortCenter`.
-// A `nextTick` ensures DOM updates (table positions) are flushed before recalculations.
+// Watch for changes in `designedTables` (e.g., when tables are moved on the design surface).
+// When table positions change, the coordinates of their field ports also change.
+// This watcher, along with `nextTick`, ensures that after any DOM updates related to table positions,
+// the `linesToRender` computed property will re-calculate line coordinates using the updated
+// port positions, thus keeping the visual links correctly anchored.
 watch(designedTables, async () => {
   await nextTick();
 }, { deep: true });
 
 onMounted(() => {
-  // ... existing onMounted logic ...
-  // Add global listener for the delete key when component is mounted.
+  // ... existing onMounted logic from original file ...
   window.addEventListener('keydown', handleDeleteKey);
 });
 
 onUnmounted(() => {
-  // ... existing onUnmounted logic ...
-  // Remove global listener for the delete key when component is unmounted.
+  // ... existing onUnmounted logic from original file ...
   window.removeEventListener('keydown', handleDeleteKey);
-  // Clean up any residual global mouse listeners from line drawing if the component
-  // is destroyed while a line is being drawn (edge case).
   document.removeEventListener('mousemove', handleGlobalMouseMove);
   document.removeEventListener('mouseup', handleGlobalMouseUp);
 });
