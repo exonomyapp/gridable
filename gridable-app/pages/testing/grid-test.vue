@@ -42,6 +42,25 @@
         </v-card>
 
         <v-card class="mt-4">
+            <v-card-title>Inline Editing Test</v-card-title>
+            <v-card-text>
+                <p class="text-caption">
+                    Double-click cells in 'Make' or 'Model' columns of the 'Sample Grid' to edit.
+                    <br />- Press Enter or click away (Blur) to save.
+                    <br />- Press Escape to cancel.
+                </p>
+                <div v-if="lastCellValueChangedEvent">
+                    <p class="font-weight-bold mt-3">Last <code>cell-value-changed</code> Event:</p>
+                    <pre class="state-display">{{ JSON.stringify(lastCellValueChangedEvent, null, 2) }}</pre>
+                    <v-btn @click="commitLastSampleEdit" block color="primary" class="mt-2" :disabled="!lastCellValueChangedEvent">
+                        Commit Last Edit to Sample Data
+                    </v-btn>
+                </div>
+                <p v-else class="text-caption mt-3">No cell edits captured yet.</p>
+            </v-card-text>
+        </v-card>
+
+        <v-card class="mt-4">
           <v-card-title>Grid State Simulation</v-card-title>
           <v-card-text>
             <v-btn @click="loadSimulatedState1" class="mr-2 mb-2" block>Load State 1 (Filter Make, Hide Price)</v-btn>
@@ -92,6 +111,7 @@
               @grid-state-change="handleGridStateSave"
               @selectionChanged="onSelectionChanged"
               @rowClick="onRowClicked"
+              @cell-value-changed="onCellValueChanged"
             />
           </v-card-text>
         </v-card>
@@ -123,8 +143,8 @@ const applyDefaultTheme = () => Object.assign(currentTheme, defaultTheme);
 // --- Grid Data ---
 const sampleColDefs = ref<UpGridColumnDefinition[]>([
   { headerName: 'ID', field: 'id', sortable: true, textAlign: 'center', width: 70, minWidth: 50, filter: 'number', filterParams: { filterType: 'number', condition: 'equals' } },
-  { headerName: 'Make', field: 'make', sortable: true, width: 180, minWidth: 100, filter: 'text', filterParams: { filterType: 'text', condition: 'contains' } },
-  { headerName: 'Model', field: 'model', sortable: true, width: 180, minWidth: 100, filter: 'text' },
+  { headerName: 'Make', field: 'make', sortable: true, width: 180, minWidth: 100, filter: 'text', filterParams: { filterType: 'text', condition: 'contains' }, editable: true },
+  { headerName: 'Model', field: 'model', sortable: true, width: 180, minWidth: 100, filter: 'text', editable: true },
   { headerName: 'Price ($)', field: 'price', sortable: true, textAlign: 'right', width: 120, minWidth: 80, filter: 'number', filterParams: { filterType: 'number', condition: 'greaterThan' } }
 ]);
 const sampleRowData = ref<UpGridRowDataItem[]>([
@@ -146,6 +166,9 @@ const currentSelectionMode = ref<'single' | 'multiple' | 'none'>('single');
 const currentSelectedIds = ref(new Set<string | number>());
 const currentSelectedData = ref<any[]>([]);
 const lastClickedRowForDisplay = ref<any | null>(null);
+
+// --- Inline Editing State ---
+const lastCellValueChangedEvent = ref<any | null>(null);
 
 
 const currentInitialGridState = reactive<{ [viewId: string]: GridState }>({
@@ -237,6 +260,35 @@ function onSelectionChanged(payload: { selectedIds: Set<string | number>, select
 function onRowClicked(payload: { row: any, event: MouseEvent }) {
   console.log("TestPage @rowClick:", payload.row);
   lastClickedRowForDisplay.value = payload.row;
+}
+
+// --- Inline Edit Event Handler ---
+function onCellValueChanged(payload: any) {
+  console.log("TestPage @cell-value-changed:", payload);
+  lastCellValueChangedEvent.value = payload;
+  // Note: We are not yet updating the actual sampleRowData here.
+  // That will be done by commitLastSampleEdit() for testing purposes.
+}
+
+function commitLastSampleEdit() {
+  if (!lastCellValueChangedEvent.value) {
+    alert("No edit event to commit.");
+    return;
+  }
+  const { rowId, field, newValue } = lastCellValueChangedEvent.value;
+  const rowIndex = sampleRowData.value.findIndex(row => row.id === rowId);
+
+  if (rowIndex !== -1) {
+    const updatedRow = { ...sampleRowData.value[rowIndex], [field]: newValue };
+    sampleRowData.value.splice(rowIndex, 1, updatedRow); // Replace item to trigger reactivity if needed
+    // Or, if direct mutation is fine and reactive:
+    // sampleRowData.value[rowIndex][field] = newValue;
+    console.log(`Committed edit: Row ID ${rowId}, Field ${field}, New Value ${newValue}. Local data updated.`);
+    lastCellValueChangedEvent.value = null; // Clear after commit
+  } else {
+    console.error(`Could not find row with ID ${rowId} in sampleRowData to commit edit.`);
+    alert(`Error: Row with ID ${rowId} not found.`);
+  }
 }
 
 // --- Programmatic Selection Test Functions ---

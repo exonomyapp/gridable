@@ -97,11 +97,28 @@
             :key="colDef.field + '-' + rowIndex"
             class="grid-data-cell"
             :style="[dataCellStyle, { 'text-align': colDef.textAlign || 'left', width: colDef.width ? colDef.width + 'px' : 'auto', minWidth: (colDef.minWidth || 50) + 'px' }]"
+            :class="{ 'cell-editable': colDef.editable && !(editingCell && editingCell.rowId === (props.rowIdField ? row[props.rowIdField] : undefined) && editingCell.field === colDef.field) }"
+            @dblclick="handleCellDblClick(row, colDef)"
           >
-           <template v-if="colDef.cellRenderer === 'checkbox'">
-             <v-checkbox density="compact" hide-details :model-value="getCellValue(row, colDef.field)" @update:model-value="(newValue) =>setCellValue(row, colDef.field, newValue, rowIndex + (currentPage - 1) * currentItemsPerPage)" class="grid-checkbox"></v-checkbox>
-           </template>
-           <template v-else>{{ getCellValue(row, colDef.field) }}</template>
+            <!-- Conditional rendering for inline editing: show input if cell is active, otherwise show standard content -->
+            <template v-if="editingCell && (props.rowIdField && editingCell.rowId === row[props.rowIdField]) && editingCell.field === colDef.field">
+              <input
+                type="text"
+                v-model="editingCellValue"
+                ref="editingInputRef"
+                class="cell-editing-input"
+                style="width: 100%; height: 100%; border: 1px solid #757575; outline: none; box-sizing: border-box; padding: 0 4px; margin: 0; font-family: inherit; font-size: inherit;"
+                @blur="handleEditBlur()"
+                @keydown.enter.prevent="handleEditEnter()"
+                @keydown.escape.prevent="handleEditEscape()"
+              />
+            </template>
+            <template v-else>
+              <template v-if="colDef.cellRenderer === 'checkbox'">
+                <v-checkbox density="compact" hide-details :model-value="getCellValue(row, colDef.field)" @update:model-value="(newValue) =>setCellValue(row, colDef.field, newValue, rowIndex + (currentPage - 1) * currentItemsPerPage)" class="grid-checkbox"></v-checkbox>
+              </template>
+              <template v-else>{{ getCellValue(row, colDef.field) }}</template>
+            </template>
          </div>
       </div>
     </div>
@@ -129,7 +146,9 @@ interface FilterCondition { filterType: 'text'|'number'|'date'|'set'; condition:
 interface FilterModel { [field: string]: FilterCondition; }
 interface ColumnDefinition {
   headerName: string; field: string; textAlign?: 'left'|'center'|'right'; sortable?: boolean;
-  width?: number; minWidth?: number; visible?: boolean; cellRenderer?: 'checkbox'|string; editable?: boolean;
+  width?: number; minWidth?: number; visible?: boolean; cellRenderer?: 'checkbox'|string;
+  /** If true, cells in this column can be double-clicked to enable inline editing. Requires `rowIdField` to be set on the grid. */
+  editable?: boolean;
   filter?: boolean|'text'|'number';
   filterParams?: { filterType?:'text'|'number'; condition?:'contains'|'startsWith'|'equals'|'notEqual'|'greaterThan'|'lessThan'|'inRange'; };
 }
@@ -143,32 +162,53 @@ const props = defineProps({
   initialGridState: { type: Object as PropType<GridState>, default: () => ({}) },
   viewId: { type: String, default: 'default-view' },
   /**
-   * Defines the row selection behavior.
-   * - `'none'`: Disables row selection.
-   * - `'single'`: Allows only one row to be selected at a time. Clicking a new row deselects the previous.
-   * - `'multiple'`: Allows multiple rows to be selected using Ctrl/Cmd+click (toggle),
-   *                 Shift+click (range selection), or simple click (replaces selection with clicked row).
+   * Defines the row selection behavior of the grid.
+   * - `'none'` (default): Row selection is disabled.
+   * - `'single'`: Allows only one row to be selected at a time. Clicking a new row deselects any previously selected row.
+   * - `'multiple'`: Allows multiple rows to be selected. Behavior includes:
+   *    - Simple click: Clears previous selections and selects the clicked row. Sets this row as the anchor for Shift+click.
+   *    - Ctrl/Cmd+Click: Toggles the selection state of the clicked row without affecting other selections. Sets this row as the anchor for Shift+click.
+   *    - Shift+Click: Selects a range of rows from the last anchored row (last row clicked without Shift) to the currently clicked row. If Ctrl/Cmd is not also held, this replaces the current selection with the range.
+   * @type {'single' | 'multiple' | 'none'}
    * @default 'none'
    */
   selectionMode: { type: String as PropType<'single' | 'multiple' | 'none'>, default: 'none' },
   /**
-   * The name of the field in `rowData` objects that contains a unique identifier for each row.
-   * This prop is **required** if `selectionMode` is `'single'` or `'multiple'` for selection to work correctly.
+   * The name of the field in each `rowData` object that serves as its unique identifier.
+   * This prop is **essential** for row selection features (`'single'` or `'multiple'`) to function correctly,
+   * as it's used to track selected rows by their ID.
+   * If `selectionMode` is not 'none' and `rowIdField` is not provided or is invalid for some rows,
+   * selection behavior for those rows may be unpredictable or disabled.
+   * @type {string}
+   * @required if selectionMode is 'single' or 'multiple'
    */
   rowIdField: { type: String, required: false }
 });
 
 /**
- * @emits selectionChanged - Fired when the set of selected rows changes.
+ * Defines the events emitted by the GridableGrid component.
+ *
+ * @emits grid-state-change - Fired when a significant UI state of the grid changes (e.g., sort order, column visibility/order/width, items per page, or filter model).
+ *   Payload: `{ viewId: string, state: GridState }`
+ *     - `viewId`: The ID of the view associated with this grid instance.
+ *     - `state`: An object representing the current comprehensive state of the grid.
+ *
+ * @emits cell-value-changed - Fired when the value of a cell is changed, typically through an interactive cell renderer like a checkbox.
+ *   Payload: `{ row: RowDataItem, field: string, newValue: any, originalRowIndex: number }`
+ *     - `row`: The data object for the row that was changed.
+ *     - `field`: The field (property key) of the cell that was changed.
+ *     - `newValue`: The new value of the cell.
+ *     - `originalRowIndex`: The index of the row in the original `rowData` array (before pagination/filtering/sorting).
+ *
+ * @emits selectionChanged - Fired whenever the set of selected rows changes, either through user interaction or programmatic calls.
  *   Payload: `{ selectedIds: Set<string | number>, selectedData: RowDataItem[] }`
- *     - `selectedIds`: A Set containing the unique IDs of the currently selected rows.
- *     - `selectedData`: An array containing the full data objects for the currently selected rows.
- * @emits rowClick - Fired when a row is clicked, regardless of selection mode.
+ *     - `selectedIds`: A `Set` containing the unique IDs (from `rowIdField`) of all currently selected rows.
+ *     - `selectedData`: An array of the full data objects for all currently selected rows.
+ *
+ * @emits rowClick - Fired when a data row is clicked, regardless of the current `selectionMode`.
  *   Payload: `{ row: RowDataItem, event: MouseEvent }`
- *     - `row`: The data object for the clicked row.
- *     - `event`: The original MouseEvent.
- * @emits grid-state-change - Fired when grid UI state (sort, columns, pagination, filter) changes.
- * @emits cell-value-changed - Fired when a cell's value is changed (e.g., by a checkbox renderer).
+ *     - `row`: The data object for the row that was clicked.
+ *     - `event`: The native `MouseEvent` object associated with the click.
  */
 const emit = defineEmits(['grid-state-change', 'cell-value-changed', 'selectionChanged', 'rowClick']);
 const { columnDefs, rowData, itemsPerPage, theme, initialGridState, viewId, selectionMode, rowIdField } = toRefs(props);
@@ -184,6 +224,27 @@ const filterInputValue = ref<string>('');
 const initialDataProcessed = ref(false);
 const gridWrapperRef = ref<HTMLElement | null>(null);
 
+// --- Inline Cell Editing State ---
+/**
+ * @ref editingCell
+ * Tracks the currently active cell for inline editing.
+ * Structure: `{ rowId: string | number, field: string }` or `null` if no cell is being edited.
+ * `rowId` is derived from `props.rowIdField` of the row being edited.
+ * `field` is the column's field name.
+ */
+const editingCell = ref<{ rowId: string | number; field: string } | null>(null);
+/**
+ * @ref editingCellValue
+ * Holds the temporary value of the cell currently being edited in an input field.
+ */
+const editingCellValue = ref<any>(null);
+/**
+ * @ref editingInputRef
+ * Template ref for the `<input>` element used during inline editing.
+ * Primarily used for managing focus on the input when editing starts.
+ */
+const editingInputRef = ref<HTMLInputElement | null>(null);
+
 // Column Resize State
 const isResizingColumn = ref(false);
 const resizingColumnIndex = ref(-1);
@@ -198,15 +259,16 @@ const dragOverColumnField = ref<string | null>(null);
 // --- Row Selection State ---
 /**
  * @ref selectedRowIdsInternal
- * A reactive Set storing the unique IDs (obtained via `props.rowIdField`) of the currently selected rows.
- * This is the primary internal state for managing row selection.
+ * A reactive `Set` storing the unique IDs (derived from the `props.rowIdField` of row data objects)
+ * of the currently selected rows. This is the primary internal state for managing row selections.
  */
 const selectedRowIdsInternal = ref(new Set<string | number>());
 /**
  * @ref lastClickedRowId
- * Stores the ID of the last row that was clicked without the Shift key being pressed.
- * This serves as the anchor point for Shift+click range selections in 'multiple' selection mode.
- * It's reset when selection mode changes, data changes, or selection is cleared programmatically.
+ * Stores the ID of the row that was last clicked without the Shift key being pressed
+ * (i.e., a simple click or a Ctrl/Cmd+click). This ID serves as the anchor point for
+ * subsequent Shift+click range selections when `selectionMode` is 'multiple'.
+ * It is reset if the selection mode changes, data is reloaded, or selection is cleared.
  */
 const lastClickedRowId = ref<string | number | null>(null);
 
@@ -268,6 +330,45 @@ function sortData(field: string) {
   notifyGridStateChange();
 }
 
+/**
+ * Handles the double-click event on a data cell to initiate inline editing.
+ * - Checks if the column definition (`colDef`) allows editing (`colDef.editable === true`).
+ * - Requires `props.rowIdField` to be set on the grid for uniquely identifying rows.
+ * - Sets `editingCell` to the target cell's `rowId` and `field`.
+ * - Populates `editingCellValue` with the current value of the cell.
+ * - Uses `nextTick` to ensure the input element is rendered, then focuses it via `editingInputRef`.
+ * @param {RowDataItem} row The data object for the row containing the double-clicked cell.
+ * @param {ColumnDefinition} colDef The column definition for the double-clicked cell.
+ */
+function handleCellDblClick(row: RowDataItem, colDef: ColumnDefinition) {
+  if (!colDef.editable) {
+    return;
+  }
+  if (!props.rowIdField) {
+    console.warn("GridableGrid: 'rowIdField' prop is required for cell editing to identify the row.");
+    return;
+  }
+  const rowId = row[props.rowIdField];
+  if (rowId === undefined || rowId === null) {
+    console.warn(`GridableGrid: 'rowIdField' ("${props.rowIdField}") not found in dblclicked row or its value is null/undefined. Cannot initiate editing.`, row);
+    return;
+  }
+
+  // If already editing this cell, do nothing
+  if (editingCell.value && editingCell.value.rowId === rowId && editingCell.value.field === colDef.field) {
+    return;
+  }
+
+  // TODO: Commit any previous edit before starting a new one - to be handled in a subsequent step
+  // if (editingCell.value) {
+  //   commitEdit();
+  // }
+
+  editingCell.value = { rowId: rowId, field: colDef.field };
+  editingCellValue.value = getCellValue(row, colDef.field); // Pass field string
+}
+
+
 function nextPage() { if(currentPage.value < totalPages.value) currentPage.value++; }
 function prevPage() { if(currentPage.value > 1) currentPage.value--; }
 function onItemsPerPageChange() { currentPage.value = 1; notifyGridStateChange(); }
@@ -287,11 +388,76 @@ function notifyGridStateChange() {
   }
 }
 
+
+function saveEdit() {
+  if (!editingCell.value) return;
+
+  const { rowId, field } = editingCell.value;
+  const originalRowData = props.rowData.find(r => props.rowIdField && r[props.rowIdField] === rowId);
+
+  if (!originalRowData) {
+    console.warn(`GridableGrid: Original row data not found for rowId "${rowId}". Cannot save edit.`);
+    editingCell.value = null;
+    editingCellValue.value = null;
+    return;
+  }
+
+  const oldValue = getCellValue(originalRowData, field);
+  const newValue = editingCellValue.value;
+
+  if (newValue !== oldValue) {
+    // Find the original index for consistency with checkbox emit, though less critical here
+    const originalRowIndex = props.rowData.findIndex(r => props.rowIdField && r[props.rowIdField] === rowId);
+
+    emit('cell-value-changed', {
+      rowId: rowId,
+      field: field,
+      oldValue: oldValue,
+      newValue: newValue,
+      rowData: originalRowData, // The row data object itself
+      originalRowIndex: originalRowIndex // Index in the original unfiltered/unsorted rowData
+    });
+    // Note: The parent component is responsible for actually updating props.rowData
+  }
+
+  editingCell.value = null;
+  editingCellValue.value = null;
+}
+
+function cancelEdit() {
+  editingCell.value = null;
+  editingCellValue.value = null;
+}
+
+function handleEditEnter() {
+  saveEdit();
+}
+
+function handleEditEscape() {
+  cancelEdit();
+}
+
+function handleEditBlur() {
+  // Save on blur, as is common behavior. saveEdit() will only emit if value changed.
+  saveEdit();
+}
+
+
 watch(rowData, () => {
   currentPage.value = 1;
   selectedRowIdsInternal.value.clear();
   lastClickedRowId.value = null;
+  editingCell.value = null; // Stop editing if data changes
 });
+
+watch(editingCell, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
+      editingInputRef.value?.focus();
+    });
+  }
+});
+
 watch(() => props.itemsPerPage, (newVal) => {
   currentItemsPerPage.value = newVal;
   currentPage.value = 1;
@@ -357,31 +523,39 @@ const paginationStyle=computed(()=>({backgroundColor:theme.value?.paginationBack
 // --- Row Selection Logic ---
 
 /**
- * Handles click events on grid rows to manage selection based on the current `selectionMode`.
- * Emits `rowClick` event for every click and `selectionChanged` event when the selection state changes.
+ * Handles click events on grid data rows to manage row selection based on the current `props.selectionMode`.
  *
- * Behavior by `selectionMode`:
- * - `'none'`: No selection occurs.
- * - `'single'`:
- *   - Clicking a row selects it and deselects any previously selected row.
- *   - Clicking an already selected row keeps it selected (can be modified to deselect).
- * - `'multiple'`:
- *   - **Simple Click (no modifiers):** Clears any previous selection and selects only the clicked row. Updates `lastClickedRowId`.
- *   - **Ctrl/Cmd+Click:** Toggles the selection state of the clicked row (adds if unselected, removes if selected) without affecting other rows. Updates `lastClickedRowId`.
- *   - **Shift+Click:** Selects a range of rows from the `lastClickedRowId` (anchor) to the currently clicked row.
- *     The range is based on the order in `paginatedData` (visible rows).
- *     If Ctrl/Cmd is also held, this range is added to the current selection (TODO for future, current behavior is to set selection to range).
- *     If only Shift is held, the previous selection is cleared, and the new range becomes the selection.
- *     `lastClickedRowId` is *not* updated by a Shift+click itself, preserving the anchor.
+ * Emits a `rowClick` event with the clicked row's data and the original mouse event.
  *
- * @param {RowDataItem} row - The data object for the clicked row.
- * @param {MouseEvent} event - The mouse click event.
+ * If `selectionMode` is `'single'`:
+ * - Clears any existing selection.
+ * - Selects the clicked row.
+ * - Updates `lastClickedRowId` for potential future Shift+click use if mode changes.
+ *
+ * If `selectionMode` is `'multiple'`:
+ * - **Shift+Click:** If `event.shiftKey` is true and `lastClickedRowId` (anchor) is set:
+ *   - Determines the range of rows in `paginatedData` between the anchor row and the clicked row.
+ *   - If Ctrl/Cmd is *not* also pressed, clears the current selection.
+ *   - Adds all rows within the identified range to the selection.
+ *   - `lastClickedRowId` (anchor) is *not* updated by a Shift+click itself.
+ * - **Ctrl/Cmd+Click:** Toggles the selection state of the clicked row (adds if unselected, removes if selected)
+ *   without affecting other selected rows. Updates `lastClickedRowId` to the clicked row.
+ * - **Simple Click (no modifiers):** Clears all previous selections and selects only the currently clicked row.
+ *   Updates `lastClickedRowId` to the clicked row.
+ *
+ * After any change to the selection, it emits a `selectionChanged` event with the new set of
+ * selected row IDs and an array of the corresponding full row data objects.
+ *
+ * Requires `props.rowIdField` to be correctly set for identifying rows.
+ *
+ * @param {RowDataItem} row - The data object for the row that was clicked.
+ * @param {MouseEvent} event - The original mouse event.
  */
 function handleRowClick(row: RowDataItem, event: MouseEvent) {
-  emit('rowClick', { row, event }); // Emit general rowClick event first
+  emit('rowClick', { row, event });
 
   if (props.selectionMode === 'none') {
-    return; // Do nothing for selection if mode is 'none'
+    return;
   }
 
   if (!props.rowIdField) {
@@ -396,16 +570,15 @@ function handleRowClick(row: RowDataItem, event: MouseEvent) {
 
   if (props.selectionMode === 'single') {
     if (selectedRowIdsInternal.value.has(rowId) && selectedRowIdsInternal.value.size === 1) {
-      // Optional: allow deselecting by clicking the already selected single row
-      // selectedRowIdsInternal.value.clear();
+      // Current behavior: clicking an already selected single row keeps it selected.
+      // To make it deselect: selectedRowIdsInternal.value.clear();
     } else {
       selectedRowIdsInternal.value.clear();
       selectedRowIdsInternal.value.add(rowId);
     }
-    lastClickedRowId.value = rowId; // Update for potential mode switch then shift-click
+    lastClickedRowId.value = rowId;
   } else if (props.selectionMode === 'multiple') {
     if (event.shiftKey && lastClickedRowId.value !== null) {
-      // Shift+click: Range selection
       const lastIdx = paginatedData.value.findIndex(r => r[props.rowIdField!] === lastClickedRowId.value);
       const currentIdx = paginatedData.value.findIndex(r => r[props.rowIdField!] === rowId);
 
@@ -413,12 +586,9 @@ function handleRowClick(row: RowDataItem, event: MouseEvent) {
         const start = Math.min(lastIdx, currentIdx);
         const end = Math.max(lastIdx, currentIdx);
 
-        // If Ctrl/Cmd is NOT held with Shift, clear previous selection before applying range.
-        // Standard behavior: Shift+Click defines a new selection range from the anchor (lastClickedRowId).
         if (!(event.ctrlKey || event.metaKey)) {
             selectedRowIdsInternal.value.clear();
         }
-        // Add all rows within the determined range (inclusive) from the currently displayed (paginated) data.
         for (let i = start; i <= end; i++) {
           const rowInRange = paginatedData.value[i];
           const idInRange = rowInRange[props.rowIdField!];
@@ -427,25 +597,21 @@ function handleRowClick(row: RowDataItem, event: MouseEvent) {
           }
         }
       }
-      // `lastClickedRowId` (the anchor) is NOT updated on a shift-click.
+      // Anchor (`lastClickedRowId`) is not updated on Shift+click.
     } else if (event.ctrlKey || event.metaKey) {
-      // Ctrl/Cmd+click: Toggle selection for the clicked row.
       if (selectedRowIdsInternal.value.has(rowId)) {
         selectedRowIdsInternal.value.delete(rowId);
       } else {
         selectedRowIdsInternal.value.add(rowId);
       }
-      lastClickedRowId.value = rowId; // A Ctrl/Cmd click also sets the anchor for a subsequent Shift+click.
+      lastClickedRowId.value = rowId; // Ctrl/Cmd click updates the anchor.
     } else {
-      // Simple click (no modifiers) in 'multiple' mode:
-      // Clears all previous selections and selects only the currently clicked row.
       selectedRowIdsInternal.value.clear();
       selectedRowIdsInternal.value.add(rowId);
-      lastClickedRowId.value = rowId; // This click sets the new anchor.
+      lastClickedRowId.value = rowId; // Simple click in multi-mode sets new selection and anchor.
     }
   }
 
-  // After any selection change, gather all selected data and emit the 'selectionChanged' event.
   const selectedData = props.rowData.filter(r => props.rowIdField && r.hasOwnProperty(props.rowIdField) && selectedRowIdsInternal.value.has(r[props.rowIdField]));
   emit('selectionChanged', new Set(selectedRowIdsInternal.value), selectedData);
 }
@@ -454,14 +620,14 @@ function handleRowClick(row: RowDataItem, event: MouseEvent) {
 // --- Exposed Public API Methods ---
 defineExpose({
   /**
-   * Returns a Set of the unique IDs of all currently selected rows.
-   * @returns {Set<string | number>} A Set containing the IDs of selected rows.
+   * Returns a reactive `Set` of the unique IDs of all currently selected rows.
+   * @returns {Set<string | number>} A `Set` containing the IDs of selected rows.
    */
   getSelectedRowIds: () => new Set(selectedRowIdsInternal.value),
   /**
    * Returns an array of the full data objects for all currently selected rows.
-   * Requires `rowIdField` prop to be correctly set.
-   * @returns {RowDataItem[]} An array of selected row data objects.
+   * This method relies on `props.rowIdField` being correctly set and present in row data.
+   * @returns {RowDataItem[]} An array of the data objects for all selected rows.
    */
   getSelectedRowsData: () => {
     if (!props.rowIdField) {
@@ -470,9 +636,11 @@ defineExpose({
     }
     return props.rowData.filter(row => props.rowIdField && row.hasOwnProperty(props.rowIdField) && selectedRowIdsInternal.value.has(row[props.rowIdField]));
   },
+  getEditingCell: () => editingCell.value,
   /**
-   * Clears the current row selection and resets the Shift+click anchor.
-   * Emits a `selectionChanged` event with empty selection.
+   * Clears all current row selections in the grid.
+   * Also resets the `lastClickedRowId` used for Shift+click range selections.
+   * Emits a `selectionChanged` event with an empty selection.
    */
   clearSelection: () => {
     selectedRowIdsInternal.value.clear();
@@ -480,12 +648,15 @@ defineExpose({
     emit('selectionChanged', new Set(), []);
   },
   /**
-   * Programmatically sets the selected rows in the grid.
-   * - Validates IDs against `props.rowData` using `props.rowIdField`.
-   * - In 'single' selection mode, if multiple IDs are provided, only the first valid ID is selected.
-   * - Resets `lastClickedRowId` (Shift+click anchor).
-   * - Emits the `selectionChanged` event with the new selection.
-   * @param {(string | number)[] | Set<string | number>} idsToSelect - An array or Set of row IDs to select.
+   * Programmatically sets the selected rows in the grid based on a provided array or Set of row IDs.
+   * - Requires `props.rowIdField` to be correctly configured.
+   * - If `selectionMode` is 'none', this method logs a warning and does nothing.
+   * - It validates the provided IDs against the current `props.rowData` to ensure only existing rows are selected.
+   * - If `selectionMode` is `'single'` and multiple valid IDs are provided, only the first valid ID found in `props.rowData` will be selected.
+   * - Resets `lastClickedRowId` (the anchor for Shift+click) as this is a programmatic change.
+   * - Emits the `selectionChanged` event with the new set of selected IDs and their corresponding row data objects.
+   *
+   * @param {(string | number)[] | Set<string | number>} idsToSelect - An array or a Set of row IDs to be selected.
    */
   setSelectedRowIds: (idsToSelect: (string | number)[] | Set<string | number>) => {
     if (!props.rowIdField) {
@@ -498,23 +669,23 @@ defineExpose({
     }
 
     const newSelectedIds = new Set<string | number>();
-    const inputIdSet = new Set(idsToSelect);
+    const inputIdSet = new Set(idsToSelect); // Standardize input to a Set
 
     if (props.selectionMode === 'single' && inputIdSet.size > 1) {
       console.warn("GridableGrid: setSelectedRowIds called with multiple IDs in 'single' selection mode. Only the first valid ID will be selected.");
-      // Find the first ID from inputIdSet that exists in the actual rowData
+      // Find the first ID from inputIdSet that is present in the actual rowData
       const firstValidIdInData = props.rowData.find(row => {
-        const rowId = row[props.rowIdField!];
+        const rowId = row[props.rowIdField!]; // Use non-null assertion as we've checked props.rowIdField
         return rowId !== undefined && rowId !== null && inputIdSet.has(rowId);
-      })?.[props.rowIdField!];
+      })?.[props.rowIdField!]; // Get the ID value itself
 
       if (firstValidIdInData !== undefined && firstValidIdInData !== null) {
         newSelectedIds.add(firstValidIdInData);
       }
     } else {
-      // For 'multiple' mode, or 'single' mode with 0 or 1 ID.
+      // For 'multiple' mode, or 'single' mode with 0 or 1 ID in idsToSelect.
       for (const row of props.rowData) {
-        const rowId = row[props.rowIdField!];
+        const rowId = row[props.rowIdField!]; // Use non-null assertion
         if (rowId !== undefined && rowId !== null && inputIdSet.has(rowId)) {
           newSelectedIds.add(rowId);
           // If single selection mode, and we've found one, that's enough.
@@ -528,30 +699,9 @@ defineExpose({
     selectedRowIdsInternal.value = newSelectedIds;
     lastClickedRowId.value = null; // Programmatic selection should reset the Shift+click anchor.
 
-    // Gather full data for selected rows and emit event.
+    // Gather full data for selected rows and emit the 'selectionChanged' event.
     const selectedData = props.rowData.filter(r => props.rowIdField && r.hasOwnProperty(props.rowIdField) && selectedRowIdsInternal.value.has(r[props.rowIdField]));
     emit('selectionChanged', new Set(selectedRowIdsInternal.value), selectedData);
   }
 });
-
-</script>
-
-<style scoped>
-/* ... existing styles ... */
-/* Applies a background color to selected rows. */
-.grid-header-cell { /* ... */ }
-.header-cell-main-content { /* ... */ }
-.header-cell-title { /* ... */ }
-.header-filter-icon { /* ... */ }
-.header-filter-input-container { /* ... */ }
-.col-resizer { /* ... */ }
-.resize-indicator { /* ... */ }
-.grid-checkbox { /* ... */ }
-
-.grid-data-row.row-selected {
-  background-color: #e0e0ff !important; /* Light blue, adjust as needed */
-}
-.grid-data-row:hover {
-    background-color: #f0f0f0;
-}
-</style>
+>>>>>>> REPLACE
