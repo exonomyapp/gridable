@@ -96,7 +96,7 @@
               <v-progress-circular indeterminate></v-progress-circular>
               <p>Reloading grid with new state...</p>
             </div>
-            <GridableGrid
+            <UpGrid
               v-else
               ref="gridApi"
               :key="gridKey"
@@ -125,8 +125,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, nextTick } from 'vue';
-import { GridableGrid } from '@upgrid/core';
-import type { GridTheme, ColumnDefinition as UpGridColumnDefinition, RowDataItem as UpGridRowDataItem } from '@upgrid/core';
+import UpGrid from '../../../packages/upGrid/src/components/UpGrid.vue'; // Adjusted path
+import type { GridTheme, ColumnDefinition as UpGridColumnDefinition, RowDataItem as UpGridRowDataItem } from '@upgrid/core'; // Assuming these types are still valid from a "core" definition
 import type { GridState, GlobalAppSettings } from '~/services/userPreferences';
 import { getViewGridState, getGlobalAppSettings, saveViewGridState } from '~/services/userPreferences';
 import { useAuthStore } from '~/store/auth';
@@ -161,7 +161,7 @@ const gridKey = ref(0); // Used to force re-render of GridableGrid when initial 
 const reloadingGrid = ref(false);
 
 // --- Grid Selection State ---
-const gridApi = ref<InstanceType<typeof GridableGrid> | null>(null);
+const gridApi = ref<InstanceType<typeof UpGrid> | null>(null);
 const currentSelectionMode = ref<'single' | 'multiple' | 'none'>('single');
 const currentSelectedIds = ref(new Set<string | number>());
 const currentSelectedData = ref<any[]>([]);
