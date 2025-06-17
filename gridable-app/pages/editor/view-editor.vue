@@ -468,7 +468,7 @@ const criteriaGridColDefs = ref([
     field: 'aggregationFunction',
     // The 'editable' property is a function that determines if the cell can be edited.
     // In this case, the aggregation function dropdown is disabled if 'group' is true for the row.
-    editable: (params: any) => !params.data.group,
+    editable: true,
     cellEditor: 'select', // Specifies that UpGrid should use a select/dropdown type editor.
     cellEditorParams: { // Parameters for the select editor.
       values: aggregationOptions // Provides the list of choices for the dropdown.
@@ -896,7 +896,6 @@ onUnmounted(() => {
 //   draggedTable.value = null;
 //   draggedTableIndex.value = -1;
 // };
-const handleCriteriaGridChange = (event: any) => {};
 
 
 </script>
@@ -940,10 +939,6 @@ const handleCriteriaGridChange = (event: any) => {};
   height: 100%;
   /* pointer-events: none; SVG itself needs clicks for deselect, line groups for select */
   z-index: 5;
-}
-.relationship-line-group {
-  /* pointer-events: all; /* This would make only the line clickable, not the transparent wider line */
-  /* The transparent line handles the click event due to being drawn first in the group */
 }
 
 

@@ -1,8 +1,5 @@
 import { ref, computed, watch, type Ref } from 'vue';
-
-export interface RowDataItem {
-  [key: string]: any;
-}
+import type { RowDataItem } from '../types';
 
 // This should align with the ColumnDefinition in UpGrid.vue or a shared types file
 export interface ColumnDefinitionForFiltering {

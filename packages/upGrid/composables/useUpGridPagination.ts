@@ -1,9 +1,5 @@
 import { ref, computed, watch, type Ref } from 'vue';
-
-// Assuming RowDataItem is generic. If it's a specific type, it should be imported or defined.
-export interface RowDataItem {
-  [key: string]: any;
-}
+import type { RowDataItem } from '../types';
 
 export interface UseUpGridPaginationProps {
   // Renamed from 'itemsPerPage' in UpGrid.vue props to 'initialItemsPerPage' for clarity in composable

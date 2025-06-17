@@ -1,8 +1,5 @@
 import { ref, computed, watch, type Ref } from 'vue';
-
-export interface RowDataItem {
-  [key: string]: any;
-}
+import type { RowDataItem } from '../types';
 
 export interface ColumnDefinitionSortable {
   field: string;

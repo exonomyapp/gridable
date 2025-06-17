@@ -3,6 +3,7 @@ import { resolve } from 'path'
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
+  compatibilityDate: '2025-06-17',
   css: [
     'vuetify/lib/styles/main.sass',
     '@mdi/font/css/materialdesignicons.css',

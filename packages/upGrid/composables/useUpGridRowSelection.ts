@@ -1,9 +1,5 @@
 import { ref, watch, type Ref } from 'vue';
-
-// Define a generic RowDataItem or import it if available from a shared types definition
-export interface RowDataItem {
-  [key: string]: any;
-}
+import type { RowDataItem } from '../types';
 
 export interface UseUpGridRowSelectionProps {
   selectionMode: Ref<string>; // 'single', 'multiple', 'none'
@@ -33,7 +29,7 @@ export function useUpGridRowSelection(
   };
 
   const handleRowClick = (row: RowDataItem, event: MouseEvent) => {
-    emit('rowClick', { row, event }); // Emit rowClick event first
+    emit('rowClick', row, event); // Emit rowClick event first
 
     if (props.selectionMode.value === 'none') {
       return;

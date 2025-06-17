@@ -1,9 +1,5 @@
 import { ref, watch, nextTick, type Ref } from 'vue';
-
-// Define a generic RowDataItem or import it if available from a shared types definition
-export interface RowDataItem {
-  [key: string]: any;
-}
+import type { RowDataItem } from '../types';
 // Potentially import ColumnDefinition if specific properties like 'editable' are needed
 // For now, assume colDef passed to handleCellDblClick is 'any' or has a 'field' and 'editable' property.
 export interface ColumnDefinitionForEdit {
