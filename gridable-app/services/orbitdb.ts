@@ -48,6 +48,16 @@ async function getHelia(): Promise<Helia> {
   return heliaNode;
 }
 
+/**
+ * Retrieves or initializes the global OrbitDB instance for the currently authenticated user.
+ * This instance is configured with a `CustomDIDIdentityProvider` based on the user's DID
+ * from the `authStore`. It also registers the `CustomDIDAccessController`.
+ * If the authenticated user changes, the existing OrbitDB instance is stopped and a new
+ * one is created for the new user.
+ *
+ * @throws {Error} If the user is not authenticated or if Libp2p is not available on the Helia node.
+ * @returns {Promise<any>} A promise that resolves to the OrbitDB instance.
+ */
 export async function getOrbitDBInstance() {
   const authStore = useAuthStore();
   const userDid = authStore.currentUser?.did;
@@ -92,18 +102,54 @@ export async function getOrbitDBInstance() {
   return orbitdb;
 }
 
-export async function getKeyValueDatabase(dbName: string = DEFAULT_KV_DB_NAME, accessControllerOptions?: any) {
+/**
+ * Opens or creates a key-value database with specified access control.
+ *
+ * This function allows for flexible access control configuration:
+ * 1.  If `accessControllerOptions` are provided, they take precedence.
+ * 2.  If `ownerControlled` is `true` and no `accessControllerOptions` are given,
+ *     the database is configured with `CustomDIDAccessController` to restrict write
+ *     access exclusively to the `currentOrbitDBUserDID` (the authenticated user).
+ *     The `verificationFunction` for the AC is also set to `mockDidVerificationFunction`.
+ * 3.  Otherwise (no `accessControllerOptions` and `ownerControlled` is `false`),
+ *     the database defaults to public write access (`{ write: ['*'] }`), implicitly
+ *     using `IPFSAccessController`.
+ *
+ * @param {string} [dbName=DEFAULT_KV_DB_NAME] - The name of the key-value database.
+ * @param {any} [accessControllerOptions] - Explicit access controller options to configure the database.
+ *                                          If provided, these settings will be used directly.
+ * @param {boolean} [ownerControlled=false] - If `true` and `accessControllerOptions` are not provided,
+ *                                            configures the DB for owner-only write access using
+ *                                            `CustomDIDAccessController` and the current user's DID.
+ * @returns {Promise<any>} A promise that resolves to the opened key-value database instance.
+ * @throws {Error} If `getOrbitDBInstance` fails (e.g., user not authenticated).
+ */
+export async function getKeyValueDatabase(
+  dbName: string = DEFAULT_KV_DB_NAME,
+  accessControllerOptions?: any,
+  ownerControlled: boolean = false
+) {
   const odb = await getOrbitDBInstance();
   console.log(`Opening/creating key-value database: ${dbName} for user ${currentOrbitDBUserDID}`);
 
-  let acToUse: any = accessControllerOptions;
-  if (!acToUse) {
-    acToUse = { write: ['*'] };
-    console.warn(`KV DB ${dbName} opening with default PUBLIC access controller (implicitly IPFSAccessController).`);
-  } else if (acToUse.type === CustomDIDAccessController.type) {
-    if (!acToUse.verificationFunction) {
-        acToUse.verificationFunction = mockDidVerificationFunction;
+  let acToUse: any;
+
+  if (accessControllerOptions) {
+    acToUse = accessControllerOptions;
+    if (acToUse.type === CustomDIDAccessController.type && !acToUse.verificationFunction) {
+      acToUse.verificationFunction = mockDidVerificationFunction;
     }
+    console.log(`[OrbitDB_Service] Using explicit accessControllerOptions for KV DB '${dbName}'.`);
+  } else if (ownerControlled && currentOrbitDBUserDID) {
+    acToUse = {
+      type: CustomDIDAccessController.type,
+      write: [currentOrbitDBUserDID], // Automatically set owner's DID
+      verificationFunction: mockDidVerificationFunction, // Provide the verification function
+    };
+    console.log(`[OrbitDB_Service] KV DB '${dbName}' configured as owner-controlled for DID: ${currentOrbitDBUserDID}.`);
+  } else {
+    acToUse = { write: ['*'] }; // Default public access
+    console.warn(`[OrbitDB_Service] KV DB '${dbName}' opening with default PUBLIC access controller (implicitly IPFSAccessController). Missing explicit AC options or ownerControlled flag/user DID.`);
   }
 
   console.log(`[OrbitDB_Service] Opening KV DB '${dbName}' with AC Options: ${JSON.stringify(acToUse)}`);
@@ -117,18 +163,54 @@ export async function getKeyValueDatabase(dbName: string = DEFAULT_KV_DB_NAME, a
   return db;
 }
 
-export async function getDocumentStoreDatabase(dbName: string, accessControllerOptions?: any) {
+/**
+ * Opens or creates a document store database with specified access control.
+ *
+ * This function follows the same access control logic as `getKeyValueDatabase`:
+ * 1.  If `accessControllerOptions` are provided, they take precedence.
+ * 2.  If `ownerControlled` is `true` and no `accessControllerOptions` are given,
+ *     the database is configured with `CustomDIDAccessController` to restrict write
+ *     access exclusively to the `currentOrbitDBUserDID` (the authenticated user).
+ *     The `verificationFunction` for the AC is also set to `mockDidVerificationFunction`.
+ * 3.  Otherwise (no `accessControllerOptions` and `ownerControlled` is `false`),
+ *     the database defaults to public write access (`{ write: ['*'] }`), implicitly
+ *     using `IPFSAccessController`.
+ *
+ * @param {string} dbName - The name of the document store database.
+ * @param {any} [accessControllerOptions] - Explicit access controller options to configure the database.
+ *                                          If provided, these settings will be used directly.
+ * @param {boolean} [ownerControlled=false] - If `true` and `accessControllerOptions` are not provided,
+ *                                            configures the DB for owner-only write access using
+ *                                            `CustomDIDAccessController` and the current user's DID.
+ * @returns {Promise<any>} A promise that resolves to the opened document store database instance.
+ * @throws {Error} If `getOrbitDBInstance` fails (e.g., user not authenticated).
+ */
+export async function getDocumentStoreDatabase(
+  dbName: string,
+  accessControllerOptions?: any,
+  ownerControlled: boolean = false
+) {
   const odb = await getOrbitDBInstance();
   console.log(`Opening/creating document store: ${dbName} for user ${currentOrbitDBUserDID}`);
 
-  let acToUse: any = accessControllerOptions;
-  if (!acToUse) {
-    acToUse = { write: ['*'] };
-    console.warn(`DocStore ${dbName} opening with default PUBLIC access controller (implicitly IPFSAccessController).`);
-  } else if (acToUse.type === CustomDIDAccessController.type) {
-     if (!acToUse.verificationFunction) {
-        acToUse.verificationFunction = mockDidVerificationFunction;
+  let acToUse: any;
+
+  if (accessControllerOptions) {
+    acToUse = accessControllerOptions;
+    if (acToUse.type === CustomDIDAccessController.type && !acToUse.verificationFunction) {
+      acToUse.verificationFunction = mockDidVerificationFunction;
     }
+    console.log(`[OrbitDB_Service] Using explicit accessControllerOptions for DocStore '${dbName}'.`);
+  } else if (ownerControlled && currentOrbitDBUserDID) {
+    acToUse = {
+      type: CustomDIDAccessController.type,
+      write: [currentOrbitDBUserDID], // Automatically set owner's DID
+      verificationFunction: mockDidVerificationFunction, // Provide the verification function
+    };
+    console.log(`[OrbitDB_Service] DocStore '${dbName}' configured as owner-controlled for DID: ${currentOrbitDBUserDID}.`);
+  } else {
+    acToUse = { write: ['*'] }; // Default public access
+    console.warn(`[OrbitDB_Service] DocStore '${dbName}' opening with default PUBLIC access controller (implicitly IPFSAccessController). Missing explicit AC options or ownerControlled flag/user DID.`);
   }
 
   console.log(`[OrbitDB_Service] Opening DocStore '${dbName}' with AC Options: ${JSON.stringify(acToUse)}`);
