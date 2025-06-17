@@ -10,22 +10,25 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@orbitdb/core": "^2.0.2",
     "@pinia/nuxt": "^0.11.1",
     "dag-json": "^1.1.0",
     "helia": "^5.4.2",
     "ipfs-unixfs": "^11.2.1",
     "libp2p": "^2.8.9",
     "nuxt": "^3.17.5",
-    "@orbitdb/core": "^2.0.2",
     "orbit-db": "^0.29.0",
     "pinia": "^3.0.3",
+    "rss-parser": "^3.13.0",
     "sass": "^1.89.2",
+    "upgrid": "file:../packages/upGrid",
+    "uuid": "^11.1.0",
     "vue": "^3.5.16",
     "vue-router": "^4.5.1",
-    "vuetify": "^3.8.0-beta.0",
-    "upgrid": "file:../packages/upGrid"
+    "vuetify": "^3.8.0-beta.0"
   },
   "devDependencies": {
-    "@mdi/font": "^7.4.47"
+    "@mdi/font": "^7.4.47",
+    "@types/uuid": "^10.0.0"
   }
 }
