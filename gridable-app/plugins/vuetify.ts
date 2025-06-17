@@ -10,8 +10,14 @@ export default defineNuxtPlugin(nuxtApp => {
     components,
     directives,
     theme: {
-      defaultTheme: 'light' // Or 'dark'
+      // The default theme will be 'light'. The theme can be changed dynamically.
     }
   })
   nuxtApp.vueApp.use(vuetify)
+
+  return {
+    provide: {
+      vuetify
+    }
+  }
 })
