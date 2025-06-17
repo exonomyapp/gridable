@@ -1,5 +1,13 @@
 # Gridable - Product Plan and Progress
 
+There are two project folders in this monorepo. The first, gridable-app is the app that uses our custom built grid component called upGrid, and the second, in the packages/upGrid folder, is the actual custom built grid component called upGrid that we're also building in tandem. At this momoment, product-plan.md contains the plan for building out both of these distinct projects. The first preliminary step is to modularize this product plan into 4 new planning documents, as follows:
+
+- [ ] **Preliminary - Separation of Interests in Documentation:**
+  - [ ] gridable-product-plan.md
+  - [ ] gridable-style-guide.md (based on Vuetify)
+  - [ ] upGrid-product-plan.md
+  - [ ] upGrid-style-guide.md (based on Vuetify)
+
 ## I. Initial Development Phase (Completed)
 
 This phase focused on establishing the foundational structure of the Gridable application, including core UI components, basic data handling, and placeholders for major features.
