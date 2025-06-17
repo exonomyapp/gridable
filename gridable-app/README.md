@@ -1,20 +1,24 @@
 # Gridable
 
-**Gridable** is a decentralized data management application inspired by the comprehensive nature of phpMyAdmin and the user-friendly interface of Microsoft Access. It leverages OrbitDB as its core database technology, providing a powerful, web-based solution for creating, managing, and sharing data tables and views directly on the IPFS network.
+**Gridable** is a decentralized data management application inspired by the comprehensive nature of phpMyAdmin and the user-friendly interface of Microsoft Access. It leverages OrbitDB as its core database technology and integrates the powerful `upGrid` component to provide a rich, web-based solution for creating, managing, and sharing data tables and views directly on the IPFS network.
 
-Our vision is to deliver a feature-rich experience comparable to AG Grid Enterprise for data viewing and manipulation, coupled with a robust theming engine for ultimate customization.
+Our vision is to deliver a sophisticated data management experience, combining deep database control with an intuitive, highly customizable user interface.
 
 ## Core Vision & Analogy
 
 Imagine a tool that combines:
 *   The database management depth of **phpMyAdmin**.
 *   The intuitive GUI and "View" building capabilities of **Microsoft Access**.
-*   The advanced data grid features of **AG Grid Enterprise**.
+*   The advanced data grid features of **AG Grid Enterprise**, delivered via our `upGrid` component.
 *   All built on a **decentralized foundation** using OrbitDB and IPFS.
 
-Gridable allows users to manage OrbitDB tables directly and construct complex "Views" (queries/data representations) using a visual editor reminiscent of MS Access. These views, powered by a highly-configurable grid component, can also feature master-detail relationships, both within the same table and across multiple OrbitDB tables.
+Gridable allows users to manage OrbitDB tables directly and construct complex "Views" (queries/data representations) using a visual editor. These views are then rendered and interacted with through the `upGrid` component, which can also feature master-detail relationships, both within the same table and across multiple OrbitDB tables.
 
-## Key Features
+## Key Features of Gridable
+
+Gridable's features are divided between the core application logic and the specialized UI components it utilizes.
+
+### Gridable Application Features
 
 *   **Decentralized Database Management & Data Ownership:**
     *   **DID-Owned Data Tables:** All OrbitDB data tables created within Gridable are owned by and cryptographically associated with the user's DID. This ensures data sovereignty and isolation.
@@ -26,15 +30,6 @@ Gridable allows users to manage OrbitDB tables directly and construct complex "V
     *   Define relationships (joins) between tables visually.
     *   Select output fields, define aliases, set sorting orders, and specify filter criteria.
     *   (Planned) Grouping and aggregation capabilities.
-*   **Advanced Grid Component (`upGrid`):**
-    *   A homegrown UI component aiming for feature parity with AG Grid Enterprise.
-    *   Used for displaying both raw table data and composed Views.
-    *   Supports sorting, filtering, pagination, column resizing/reordering/visibility, and (planned) row selection, inline editing.
-    *   (Planned) Master-detail views and custom cell renderers.
-*   **Robust Theming Engine:**
-    *   **System-Level Grid Theming Editor:** Customize every visual aspect of the grid component for a consistent look and feel during development and administration.
-    *   **View-Level Theming Editor:** Style specific Views when they are published or shared, allowing for unique presentations.
-    *   Themes can include custom colors, borders, fonts, and even background images where applicable.
 *   **Decentralized Sharing & Collaboration:**
     *   Publish Views (and their underlying data structure) via Helia (IPFS).
     *   Share Views with other users (DIDs) similar to sharing documents in Google Docs.
@@ -47,10 +42,26 @@ Gridable allows users to manage OrbitDB tables directly and construct complex "V
 *   **DID-Specific Configuration Storage:**
     *   All Gridable configurations (definitions of known tables, user-created views, themes, sharing links, etc.) are stored in OrbitDB and are associated with the specific user's DID, ensuring configurations are also isolated per user.
 
+### Advanced Data Grid Features (via `upGrid`)
+
+Gridable uses `upGrid`, a homegrown, feature-rich UI component, for displaying both raw table data and composed Views. `upGrid` provides the following features:
+
+*   **Advanced Interactivity:**
+    *   Sorting, filtering, and pagination.
+    *   Column resizing, reordering, and visibility toggles.
+    *   Row selection (single and multiple).
+    *   (Planned) Inline cell editing.
+    *   (Planned) Master-detail views and custom cell renderers.
+*   **Robust Theming Engine:**
+    *   **System-Level Grid Theming:** Customize every visual aspect of every upGrid implementation for a consistent yet customizable look and feel.
+    *   **View-Level Theming:** Style specific Views when they are published or shared, allowing for unique presentations.
+    *   Themes can include custom colors, borders, fonts, buttons, icons, and even background images or videos.
+
 ## Technology Stack
 
 *   **Frontend Framework:** [Nuxt 3](https://nuxt.com/)
 *   **UI Library:** [Vuetify 3](https://vuetifyjs.com/) (Material Design)
+*   **Grid Component:** `upGrid` (in-house)
 *   **Layout Philosophy:** CSS:Grid
 *   **State Management:** [Pinia](https://pinia.vuejs.org/)
 *   **Database:** [OrbitDB](https://orbitdb.org/)
@@ -59,7 +70,7 @@ Gridable allows users to manage OrbitDB tables directly and construct complex "V
 
 ## Project Status
 
-This project is under active development. For detailed progress and planned features, please see the [Product Plan](./docs/product-plan.md).
+This project is under active development. For detailed progress and planned features, please see the [Product Plan](./docs/gridable-product-plan.md).
 
 ## Getting Started (Development)
 
@@ -100,4 +111,3 @@ Locally preview production build:
 
 ```bash
 npm run preview
-```
