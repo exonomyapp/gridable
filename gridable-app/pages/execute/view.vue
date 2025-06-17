@@ -40,7 +40,7 @@
             View ID: {{ viewDefinition._id || viewDefinition.viewId }} (DB: {{ viewAddress }})
           </v-card-subtitle>
           <v-card-text>
-            <GridableGrid
+            <UpGrid
               v-if="viewResults.length > 0 || !initialDataLoaded"
               :column-defs="resultGridColDefs"
               :row-data="viewResults"
@@ -83,7 +83,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import GridableGrid from '~/components/core/GridableGrid.vue';
 import { useAuthStore } from '~/store/auth';
 import { getDocumentStoreDatabase, getKeyValueDatabase } from '~/services/orbitdb';
 import { getViewGridState, saveViewGridState, type GridState } from '~/services/userPreferences';
@@ -336,141 +335,6 @@ function executeAndCombineAllData(
 async function loadAndExecuteView() {
   loadingView.value = true;
   executionError.value = null;
- * @param tableId The tableId to use as a prefix.
- * @returns A new object with prefixed keys.
- */
-function prefixFields(row: any, tableId: string): any {
-  const prefixedRow: any = {};
-  for (const key in row) {
-    if (Object.prototype.hasOwnProperty.call(row, key)) {
-      prefixedRow[`${tableId}_${key}`] = row[key];
-    }
-  }
-  return prefixedRow;
-}
-
-/**
- * Fetches data from all tables in the view definition, then combines them based on relationships.
- * Currently implements a simplified iterative INNER JOIN strategy.
- * @param viewDef The ViewDefinition object.
- * @param allFetchedTableData A Map containing pre-fetched raw data for each table, keyed by tableId.
- * @returns An array of combined (joined) row objects with fields prefixed by tableId.
- */
-function executeAndCombineAllData(
-  viewDef: ViewDefinition,
-  allFetchedTableData: Map<string, any[]>
-): any[] {
-  if (!viewDef.tables || viewDef.tables.length === 0) {
-    return [];
-  }
-
-  // If no relationships or only one table, just prefix its data and return.
-  if (!viewDef.relationships || viewDef.relationships.length === 0) {
-    const firstTableRef = viewDef.tables[0];
-    const tableData = allFetchedTableData.get(firstTableRef.tableId) || [];
-    return tableData.map(row => prefixFields(row, firstTableRef.tableId));
-  }
-
-  let processedData: any[] = [];
-  const initialRel = viewDef.relationships[0]; // TODO: More robust starting point for complex join trees
-
-  // Initialize with the first table in the first relationship
-  const leftTableId = initialRel.sourceTableId;
-  const leftTableData = allFetchedTableData.get(leftTableId) || [];
-  if (leftTableData.length === 0 && viewDef.relationships.length > 0) { // If first table in chain is empty, inner join result is empty
-      console.warn(`[executeAndCombineAllData] Initial left table ${leftTableId} has no data. INNER JOIN will result in empty set.`);
-      return [];
-  }
-  processedData = leftTableData.map(row => prefixFields(row, leftTableId));
-
-  const joinedTableIds = new Set<string>([leftTableId]);
-
-  // Iteratively join remaining tables based on relationships
-  // This simple loop assumes a somewhat linear chain or that relationships are ordered correctly.
-  // A more robust solution would build a proper join tree/plan.
-  for (const rel of viewDef.relationships) {
-    let currentLeftTableId: string | undefined;
-    let currentRightTableId: string | undefined;
-    let currentLeftJoinFieldKey: string | undefined;
-    let currentRightJoinFieldOriginal: string | undefined;
-    let newTableToJoinId: string | undefined;
-
-    // Determine which side of the relationship is already in `processedData`
-    if (joinedTableIds.has(rel.sourceTableId) && !joinedTableIds.has(rel.targetTableId)) {
-      currentLeftTableId = rel.sourceTableId;
-      currentRightTableId = rel.targetTableId;
-      currentLeftJoinFieldKey = `${rel.sourceTableId}_${rel.sourceFieldId}`;
-      currentRightJoinFieldOriginal = rel.targetFieldId;
-      newTableToJoinId = rel.targetTableId;
-    } else if (!joinedTableIds.has(rel.sourceTableId) && joinedTableIds.has(rel.targetTableId)) {
-      // Swap: treat target as left, source as right for this join step
-      currentLeftTableId = rel.targetTableId;
-      currentRightTableId = rel.sourceTableId;
-      currentLeftJoinFieldKey = `${rel.targetTableId}_${rel.targetFieldId}`;
-      currentRightJoinFieldOriginal = rel.sourceFieldId;
-      newTableToJoinId = rel.sourceTableId;
-    } else if (joinedTableIds.has(rel.sourceTableId) && joinedTableIds.has(rel.targetTableId)) {
-      // Both tables already joined (e.g. complex relationship or redundant definition), skip for now.
-      // Or, this could be a self-join if table IDs were aliased, but not supported yet.
-      console.warn(`[executeAndCombineAllData] Skipping relationship as both tables ${rel.sourceTableId} and ${rel.targetTableId} are already notionally joined.`);
-      continue;
-    } else {
-      // This relationship connects two tables not yet in the main dataset, or logic error.
-      // This can happen if the first relationship didn't involve the initial `leftTableId` from above.
-      // For this simplified iterative join, we require one part of the relationship to already be 'processed'.
-      console.error(`[executeAndCombineAllData] Cannot process relationship: neither source (${rel.sourceTableId}) nor target (${rel.targetTableId}) is in the current joined set. Relationships might be out of order or disconnected.`);
-      return []; // Or handle more gracefully
-    }
-
-    if (!newTableToJoinId) { // Should not happen if logic above is correct
-        console.error("[executeAndCombineAllData] Error identifying new table to join for relationship:", rel);
-        return [];
-    }
-
-    const rightTableDataOriginal = allFetchedTableData.get(newTableToJoinId) || [];
-    if (rightTableDataOriginal.length === 0) {
-      console.warn(`[executeAndCombineAllData] Right table ${newTableToJoinId} for join has no data. INNER JOIN will result in empty set.`);
-      return []; // INNER JOIN behavior
-    }
-
-    // Build a hash map for the right table for efficient lookup
-    const rightTableHashMap = new Map<any, any[]>();
-    rightTableDataOriginal.forEach(row => {
-      const joinValue = row[currentRightJoinFieldOriginal!];
-      if (!rightTableHashMap.has(joinValue)) {
-        rightTableHashMap.set(joinValue, []);
-      }
-      rightTableHashMap.get(joinValue)!.push(row);
-    });
-
-    const nextProcessedData: any[] = [];
-    processedData.forEach(leftRow => {
-      const leftJoinValue = leftRow[currentLeftJoinFieldKey!];
-      const matchingRightRows = rightTableHashMap.get(leftJoinValue);
-      if (matchingRightRows) {
-        matchingRightRows.forEach(rightRowOriginal => {
-          nextProcessedData.push({
-            ...leftRow,
-            ...prefixFields(rightRowOriginal, newTableToJoinId!)
-          });
-        });
-      }
-    });
-    processedData = nextProcessedData;
-    joinedTableIds.add(newTableToJoinId);
-
-    if (processedData.length === 0) {
-      console.warn(`[executeAndCombineAllData] Join resulted in zero rows. Halting further joins.`);
-      break; // No more rows to join with
-    }
-  }
-  return processedData;
-}
-
-
-async function loadAndExecuteView() {
-  loadingView.value = true;
-  executionError.value = null;
   initialDataLoaded.value = false;
   viewResults.value = [];
   resultGridColDefs.value = [];
@@ -636,7 +500,7 @@ async function loadAndExecuteView() {
         }));
     } else {
         // Fallback if processedData is empty: generate columns from criteria.
-        const outputCriteria = relevantCriteria.filter(c => c.output);
+        const outputCriteria = viewDefinition.value.criteria.filter(c => c.output);
          if(outputCriteria.length === 0 && viewDefinition.value.criteria.length > 0) { // Check if criteria existed
             console.warn("[ExecuteView] No output fields specified or all data filtered out. Grid columns may be empty or based on initial criteria if no data to infer from.");
             resultGridColDefs.value = []; // No data, no output criteria = no columns

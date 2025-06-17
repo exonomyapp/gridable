@@ -1,4 +1,5 @@
 import { defineNuxtConfig } from 'nuxt/config'
+import { resolve } from 'path'
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
@@ -13,6 +14,9 @@ export default defineNuxtConfig({
   modules: [
     '@pinia/nuxt',
   ],
+  extends: [
+    resolve(__dirname, '../packages/upGrid')
+  ],
   vite: {
     define: {
       'process.env.DEBUG': false,
@@ -20,7 +24,6 @@ export default defineNuxtConfig({
     },
     resolve: {
       alias: {
-        '@upgrid/core': './packages/upGrid/src', // Added for local upGrid package
         // Polyfill for Node.js 'fs' and 'path' if some deep dependency needs it
         // 'fs': 'rollup-plugin-node-builtins/src/es6/fs.js',
         // 'path': 'rollup-plugin-node-builtins/src/es6/path.js',

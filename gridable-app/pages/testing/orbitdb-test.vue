@@ -46,7 +46,7 @@
             <v-btn @click="loadKVData" :loading="loading.loadKV" :disabled="!isKVDBReady" small class="mb-3">
               Refresh KV Data
             </v-btn>
-            <GridableGrid v-if="isKVDBReady" :column-defs="gridColumns" :row-data="gridData" :items-per-page="5" />
+            <UpGrid v-if="isKVDBReady" :column-defs="gridColumns" :row-data="gridData" :items-per-page="5" />
             <p v-else>Key-Value Store not initialized.</p>
           </v-card-text>
         </v-card>
@@ -90,7 +90,6 @@
 
 <script setup lang="ts">
 import { ref, onUnmounted, computed, defineAsyncComponent } from 'vue';
-import GridableGrid from '~/components/core/GridableGrid.vue';
 import { useAuthStore } from '~/store/auth'; // Added for auth
 import {
   getOrbitDBInstance,
@@ -359,7 +358,7 @@ async function fetchDocumentById() {
       fetchedDocument.value = doc;
       setStatus(`Document with _id "${docIdToFetch.value}" fetched.`, "success");
     } else {
-      setStatus(`Document with _id "${docIdToFetch.value}" not found.`, "warning");
+      setStatus(`Document with _id "${docIdToFetch.value}" not found.`, "info");
     }
   } catch (error: any) { console.error("Error fetching document by ID:", error); setStatus(`Error fetching document: ${error.message}`, "error"); }
   finally { loading.value.docGet = false; }
@@ -539,7 +538,7 @@ async function runTestCase2() {
          setStatus("Test Case 2: Write denied for other DID (Success!)", "success", 5000);
       } else {
          testCase2Result.value += `\n    UNEXPECTED ERROR: Write by DID_B failed, but not with a clear access control error. Error: ${writeError.message}`;
-         setStatus("Test Case 2: Write failed, but error type unclear.", "warning", 0);
+         setStatus("Test Case 2: Write failed, but error type unclear.", "info", 0);
       }
     }
   } catch (e: any) { // Catch errors from setting up DID_B's stack or opening the DB.

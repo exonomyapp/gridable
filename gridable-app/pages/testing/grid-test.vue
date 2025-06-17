@@ -125,8 +125,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, nextTick } from 'vue';
-import UpGrid from '../../../packages/upGrid/src/components/UpGrid.vue'; // Adjusted path
-import type { GridTheme, ColumnDefinition as UpGridColumnDefinition, RowDataItem as UpGridRowDataItem } from '@upgrid/core'; // Assuming these types are still valid from a "core" definition
+import type { upGridTheme as GridTheme, ColumnDefinition as UpGridColumnDefinition, RowDataItem as UpGridRowDataItem } from 'upgrid';
 import type { GridState, GlobalAppSettings } from '~/services/userPreferences';
 import { getViewGridState, getGlobalAppSettings, saveViewGridState } from '~/services/userPreferences';
 import { useAuthStore } from '~/store/auth';

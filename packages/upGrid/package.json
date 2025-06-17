@@ -2,24 +2,16 @@
   "name": "upgrid",
   "version": "0.0.1",
   "description": "A feature-rich grid component, inspired by AG Grid, for Vue 3.",
-  "main": "dist/upGrid.umd.js",
-  "module": "dist/upGrid.es.js",
-  "types": "dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/upGrid.es.js",
-      "require": "./dist/upGrid.umd.js",
-      "types": "./dist/types/index.d.ts"
-    },
-    "./style.css": "./dist/style.css"
-  },
+  "main": "index.ts",
+  "types": "index.ts",
   "files": [
-    "dist",
-    "src"
+    "components",
+    "composables",
+    "types",
+    "index.ts"
   ],
   "scripts": {
     "dev": "echo 'upGrid dev script placeholder'",
-    "build": "echo 'upGrid build script placeholder - e.g., using Vite library mode'",
     "lint": "echo 'upGrid lint placeholder'"
   },
   "keywords": [
@@ -37,12 +29,12 @@
     "vuetify": "^3.0.0"
   },
   "devDependencies": {
+    "@nuxt/kit": "^3.17.5",
     "@vitejs/plugin-vue": "^4.0.0",
+    "nuxt": "^3.17.5",
     "typescript": "^5.0.0",
     "vite": "^4.0.0",
     "vue": "^3.0.0",
     "vuetify": "^3.0.0"
-  },
-  "dependencies": {
   }
 }

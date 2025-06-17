@@ -171,7 +171,7 @@
           <v-card-title>Field Selection & Criteria Grid</v-card-title>
           <v-card-text>
             <p class="text-caption mb-2" v-if="designedTables.length === 0">Add tables to the design surface to see their fields here.</p>
-            <GridableGrid v-else :column-defs="criteriaGridColDefs" :row-data="criteriaGridRowData" :items-per-page="10" @cell-value-changed="handleCriteriaGridChange" />
+            <UpGrid v-else :column-defs="criteriaGridColDefs" :row-data="criteriaGridRowData" :items-per-page="10" @cell-value-changed="handleCriteriaGridChange" />
           </v-card-text>
         </v-card>
       </v-col>
@@ -182,7 +182,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
-import GridableGrid from '~/components/core/GridableGrid.vue';
 import { useAuthStore } from '~/store/auth';
 import {
   getAllTableMetadata, registerTable, getTableMetadata,
@@ -470,7 +469,7 @@ const criteriaGridColDefs = ref([
     // The 'editable' property is a function that determines if the cell can be edited.
     // In this case, the aggregation function dropdown is disabled if 'group' is true for the row.
     editable: (params: any) => !params.data.group,
-    cellEditor: 'select', // Specifies that GridableGrid should use a select/dropdown type editor.
+    cellEditor: 'select', // Specifies that UpGrid should use a select/dropdown type editor.
     cellEditorParams: { // Parameters for the select editor.
       values: aggregationOptions // Provides the list of choices for the dropdown.
     },
@@ -480,12 +479,12 @@ const criteriaGridColDefs = ref([
 const criteriaGridRowData = ref<CriteriaRow[]>([]);
 
 /**
- * Handles the `cell-value-changed` event emitted by the `GridableGrid` component
+ * Handles the `cell-value-changed` event emitted by the `UpGrid` component
  * when a cell in the criteria grid is edited.
  * This function is responsible for updating the `criteriaGridRowData` when users modify
  * values in columns like 'Alias', 'Sort', 'Filter', or the 'Aggregate' (aggregationFunction) column.
  *
- * For checkbox columns ('Output', 'Group By'), `GridableGrid` is expected to directly
+ * For checkbox columns ('Output', 'Group By'), `UpGrid` is expected to directly
  * modify the corresponding boolean property in the `CriteriaRow` object due to Vue's
  * reactivity and how its 'checkbox' cell renderer likely works (e.g., v-model or direct mutation).
  * However, if a checkbox change also triggers this event, the mutual exclusivity logic here will
@@ -496,7 +495,7 @@ const criteriaGridRowData = ref<CriteriaRow[]>([]);
  * - If an `aggregationFunction` (e.g., 'SUM', 'AVG') is selected for a field, its `group` status is set to `false`.
  *   This ensures a field is either used for grouping or for aggregation, not both.
  *
- * @param {object} event - The event object emitted by `GridableGrid`.
+ * @param {object} event - The event object emitted by `UpGrid`.
  * @param {CriteriaRow} event.data - The data object for the row that was changed.
  * @param {keyof CriteriaRow} event.field - The field (property name) of the `CriteriaRow` that was changed.
  * @param {any} event.newValue - The new value for the changed field.
@@ -507,7 +506,7 @@ function handleCriteriaGridChange(event: { data: CriteriaRow, field: keyof Crite
   const rowIndex = criteriaGridRowData.value.findIndex(r => r === rowData);
 
   if (rowIndex !== -1) {
-    // Create a copy of the row to modify, to ensure reactivity if GridableGrid doesn't deeply update.
+    // Create a copy of the row to modify, to ensure reactivity if UpGrid doesn't deeply update.
     const updatedRow = { ...criteriaGridRowData.value[rowIndex] };
 
     // Update the specific field that changed.
