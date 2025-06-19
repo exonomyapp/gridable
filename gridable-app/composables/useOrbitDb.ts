@@ -1,29 +1,28 @@
 import { ref, onMounted } from 'vue';
-import { getOrbitDBInstance, getKeyValueDatabase } from '~/services/orbitdb';
-
-const orbitdb = ref<any>(null);
-const db = ref<any>(null);
+import { useNuxtApp } from '#app';
 
 export function useOrbitDb(dbName: string = 'default-kv') {
+  const { $getKeyValueDatabase, $orbitdb } = useNuxtApp();
   const isDbReady = ref(false);
+  const db = ref<any>(null);
 
   const initialize = async () => {
-    try {
-      orbitdb.value = await getOrbitDBInstance();
-      console.log(`OrbitDB instance retrieved for ${dbName}.`);
-      db.value = await getKeyValueDatabase(dbName, undefined, true); // Owner-controlled
-      console.log(`Database ${dbName} opened at address: ${db.value.address}`);
-      isDbReady.value = true;
-    } catch (error) {
-      console.error(`Failed to initialize OrbitDB or database ${dbName}:`, error);
-      isDbReady.value = false;
+    if (process.client) {
+      try {
+        db.value = await $getKeyValueDatabase(dbName, undefined, true); // Owner-controlled
+        console.log(`Database ${dbName} opened at address: ${db.value.address}`);
+        isDbReady.value = true;
+      } catch (error) {
+        console.error(`Failed to initialize OrbitDB or database ${dbName}:`, error);
+        isDbReady.value = false;
+      }
     }
   };
 
   onMounted(initialize);
 
   return {
-    orbitdb,
+    orbitdb: $orbitdb,
     db,
     isDbReady,
   };

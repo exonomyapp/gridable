@@ -10,10 +10,10 @@
         </v-chip>
       </template>
       <v-list dense>
-        <v-list-item to="/profile">
+        <v-list-item to="/user/profile">
           <v-list-item-title>Profile</v-list-item-title>
         </v-list-item>
-        <v-list-item to="/settings">
+        <v-list-item to="/user/settings">
           <v-list-item-title>Settings</v-list-item-title>
         </v-list-item>
         <v-divider></v-divider>

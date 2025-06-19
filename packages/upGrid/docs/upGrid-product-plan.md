@@ -1,46 +1,44 @@
-# upGrid - Product Plan
+# upGrid - Product Plan & Progress
 
-This document outlines the product plan for the `upGrid` component, a custom-built, feature-rich grid component.
+This document outlines the product plan and current progress for the `upGrid` component.
 
-## I. Initial Development Phase (Completed)
+## I. Core Functionality (Completed)
 
-This phase focused on establishing the foundational structure of the `upGrid` component.
+This phase focused on establishing the foundational structure and core interactive features of the `upGrid` component.
 
-- [x] **1. Core UI Framework - Grid Component (Advanced):**
-  - [x] Developed a foundational `UpGrid.vue` component using CSS:Grid (`../src/components/UpGrid.vue`).
-  - [x] Implemented basic data rendering (props: `columnDefs`, `rowData`).
-  - [x] Added features: sorting, pagination, basic column width/order/visibility concepts.
-  - [x] Explicitly noted the goal to emulate AG Grid Enterprise features, with placeholders for advanced capabilities.
-  - [x] Created a test page `pages/testing/grid-test.vue`.
+- [x] **1. Foundational Grid Component:**
+  - [x] Developed the core `UpGrid.vue` component.
+  - [x] Implemented basic data rendering via `columnDefs` and `rowData` props.
+  - [x] Added core features: sorting, pagination, and row selection (single and multiple).
 
-- [x] **2. Theming Engine (Basic):**
-  - [x] Implemented basic theming capabilities for `UpGrid.vue`.
-  - [x] Added a `theme` prop and `upGridTheme` interface (`../src/components/upGridTheme.ts`) to control colors, borders, etc.
-  - [x] Updated `grid-test.vue` with UI controls to demonstrate and test theme changes.
+- [x] **2. Advanced Interactivity & State Persistence:**
+  - [x] Implemented robust column resizing.
+  - [x] Implemented column reordering (drag & drop).
+  - [x] Implemented column visibility toggling.
+  - [x] Implemented per-column advanced filtering (text/number).
+  - [x] Implemented inline cell editing.
+  - [x] Developed a state management system to persist all UI customizations (column order, width, sort, filters, etc.). The grid accepts an `initialGridState` prop and emits a `grid-state-change` event.
+
+- [x] **3. Theming Engine:**
+  - [x] Implemented a flexible theming system via the `theme` prop, which accepts a `upGridTheme` object to control all visual aspects of the grid.
 
 ## II. Next Development Phase (Proposed)
 
-This phase will focus on building out advanced features for the `upGrid` component.
+This phase will focus on packaging the component for broader reusability and adding more advanced rendering capabilities.
 
-### A. Core Functionality & Interactivity
+### A. Packaging & Reusability
 
-- [x] **1. UpGrid.vue - Advanced AG Grid Features (Key UI interactions implemented):**
-  - [x] Implement robust column resizing with persistence.
-  - [x] Implement robust column reordering (drag & drop) with persistence.
-  - [x] Implement basic advanced filtering (per column, text/number) with persistence.
-  - [x] Implement column visibility toggle with persistence.
-  - [x] Implement row selection (single, multiple) with programmatic access. (Implemented single, multiple modes with Ctrl/Cmd+click toggle, Shift+click range selection. Exposed methods for get/set/clear selection.)
-  - [ ] Implement inline cell editing for data in tables (OrbitDB backend).
-  - [ ] Investigate and implement strategies for handling large datasets (e.g., virtual scrolling, data windowing if OrbitDB supports it efficiently).
-  - [ ] Support custom cell renderers (e.g., for displaying images, links, or custom Vue components within cells). (Basic checkbox renderer implemented).
+- [ ] **1. Package `upGrid` as an NPM Module:**
+  - [ ] Refactor the component and its dependencies into a structure suitable for publishing as an independent npm package.
+  - [ ] Define a clear public API and provide comprehensive documentation.
+  - [ ] Set up a dedicated build process and implement unit and integration tests.
+  - [ ] Publish the package to a registry.
+  - [ ] Integrate the `upGrid` package back into the main Gridable application, replacing the local component.
 
-### B. Componentization & Reusability
+### B. Advanced Features
 
-- [ ] **1. Package UpGrid as an NPM Module (`upGrid`):**
-  - [ ] Refactor `UpGrid.vue` and its dependencies (like `upGridTheme.ts`, and potentially some base types) into a structure suitable for publishing as an independent npm package.
-  - [ ] Define a clear public API for `upGrid`.
-  - [ ] Set up a separate build process for the `upGrid` package (e.g., using Vite library mode or similar).
-  - [ ] Implement comprehensive unit and integration tests for `upGrid`.
-  - [ ] Publish `upGrid` to npm (initially as a private package if desired, or public).
-  - [ ] **Integrate `upGrid` back into the main Gridable project**: Replace the local `../src/components/UpGrid.vue` with the imported `upGrid` package from npm.
-  - [ ] Establish a workflow for developing and versioning `upGrid` alongside or independently of the main Gridable application.
+- [ ] **2. Advanced Cell Rendering:**
+  - [ ] Implement support for custom Vue components as cell renderers to display complex data (e.g., images, links, charts).
+
+- [ ] **3. Performance Optimization:**
+  - [ ] Investigate and implement strategies for handling very large datasets, such as virtual scrolling or data windowing, to ensure the grid remains performant.

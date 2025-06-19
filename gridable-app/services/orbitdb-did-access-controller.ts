@@ -1,5 +1,5 @@
 // Import the Identity Provider and verification function type
-import { CustomDIDIdentityProvider, DidVerificationFunction } from './orbitdb-did-identity-provider';
+import { CustomDIDIdentityProvider, type DidVerificationFunction } from './orbitdb-did-identity-provider';
 
 interface AccessControllerOptions {
   write: string[]; // Array of DIDs that have write access (typically just the owner's DID for private DBs)

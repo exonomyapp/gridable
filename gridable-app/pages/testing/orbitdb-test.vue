@@ -1,91 +1,103 @@
 <template>
-  <v-container fluid>
-    <v-row>
-      <v-col>
-        <h2>OrbitDB Test Page</h2>
-        <p>Testing OrbitDB integration: Key-Value and Document Stores.</p>
-        <v-alert v-if="statusMessage" :type="statusType" dense dismissible>
-          {{ statusMessage }}
-        </v-alert>
-      </v-col>
-    </v-row>
+  <client-only>
+    <v-container fluid>
+      <v-row>
+        <v-col>
+          <h2>OrbitDB Test Page</h2>
+          <p>Testing OrbitDB integration: Key-Value and Document Stores.</p>
+          <v-alert v-if="statusMessage" :type="statusType" dense dismissible>
+            {{ statusMessage }}
+          </v-alert>
+        </v-col>
+      </v-row>
 
-    <!-- Key-Value Store Tests -->
-    <v-row>
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>KV Store Controls</v-card-title>
-          <v-card-text>
-            <v-btn @click="initKVDB" :loading="loading.initKV" :disabled="isKVDBReady" block class="mb-2">
-              Initialize KV Store
-            </v-btn>
-            <v-divider class="my-3"></v-divider>
-            <v-text-field v-model="newItem.id" label="Item ID (Key)" :disabled="!isKVDBReady"></v-text-field>
-            <v-text-field v-model="newItem.name" label="Item Name" :disabled="!isKVDBReady"></v-text-field>
-            <v-text-field v-model="newItem.value" label="Item Value" :disabled="!isKVDBReady"></v-text-field>
-            <v-btn @click="addItem" :loading="loading.add" :disabled="!isKVDBReady || !newItem.id || !newItem.name" block class="mb-2">
-              Add Item to KV
-            </v-btn>
-            <v-divider class="my-3"></v-divider>
-            <v-text-field v-model="deleteKey" label="ID to Delete" :disabled="!isKVDBReady"></v-text-field>
-            <v-btn @click="deleteItem" :loading="loading.delete" :disabled="!isKVDBReady || !deleteKey" block color="error" class="mb-2">
-              Delete Item by ID (KV)
-            </v-btn>
-             <v-divider class="my-3"></v-divider>
-            <v-btn @click="closeDB" :loading="loading.close" block class="mt-2">
-              Close OrbitDB & Helia
-            </v-btn>
-          </v-card-text>
-        </v-card>
-      </v-col>
+      <!-- Key-Value Store Tests -->
+      <v-row>
+        <v-col cols="12" md="4">
+          <v-card>
+            <v-card-title>KV Store Controls</v-card-title>
+            <v-card-text>
+              <v-btn @click="initKVDB" :loading="loading.initKV" :disabled="isKVDBReady" block class="mb-2">
+                Initialize KV Store
+              </v-btn>
+              <v-divider class="my-3"></v-divider>
+              <v-text-field v-model="newItem.id" label="Item ID (Key)" :disabled="!isKVDBReady"></v-text-field>
+              <v-text-field v-model="newItem.name" label="Item Name" :disabled="!isKVDBReady"></v-text-field>
+              <v-text-field v-model="newItem.value" label="Item Value" :disabled="!isKVDBReady"></v-text-field>
+              <v-btn @click="addItem" :loading="loading.add" :disabled="!isKVDBReady || !newItem.id || !newItem.name" block class="mb-2">
+                Add Item to KV
+              </v-btn>
+              <v-divider class="my-3"></v-divider>
+              <v-text-field v-model="deleteKey" label="ID to Delete" :disabled="!isKVDBReady"></v-text-field>
+              <v-btn @click="deleteItem" :loading="loading.delete" :disabled="!isKVDBReady || !deleteKey" block color="error" class="mb-2">
+                Delete Item by ID (KV)
+              </v-btn>
+               <v-divider class="my-3"></v-divider>
+              <v-btn @click="closeDB" :loading="loading.close" block class="mt-2">
+                Close OrbitDB & Helia
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
 
-      <v-col cols="12" md="8">
-        <v-card>
-          <v-card-title>Data from Key-Value Store</v-card-title>
-          <v-card-text>
-            <v-btn @click="loadKVData" :loading="loading.loadKV" :disabled="!isKVDBReady" small class="mb-3">
-              Refresh KV Data
-            </v-btn>
-            <UpGrid v-if="isKVDBReady" :column-defs="gridColumns" :row-data="gridData" :items-per-page="5" />
-            <p v-else>Key-Value Store not initialized.</p>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+        <v-col cols="12" md="8">
+          <v-card>
+            <v-card-title>Data from Key-Value Store</v-card-title>
+            <v-card-text>
+              <v-btn @click="loadKVData" :loading="loading.loadKV" :disabled="!isKVDBReady" small class="mb-3">
+                Refresh KV Data
+              </v-btn>
+              <UpGrid v-if="isKVDBReady" :column-defs="gridColumns" :row-data="gridData" :items-per-page="5" />
+              <p v-else>Key-Value Store not initialized.</p>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
 
-    <!-- Document Store Tests -->
-    <v-row class="mt-4">
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>Document Store Tests</v-card-title>
-          <v-card-text>
-            <v-text-field v-model="docStoreName" label="Document Store Name (e.g., my-docs-db)" :disabled="!orbitDBInstance" hint="Will be created if it does not exist. Ensure OrbitDB is initialized first (via KV Store section or implicitly)."></v-text-field>
-            <v-btn @click="openOrCreateDocStore" :loading="loading.docStoreOpen" :disabled="!orbitDBInstance || !docStoreName" block class="mb-3">
-              Open/Create Document Store
-            </v-btn>
+      <!-- Document Store Tests -->
+      <v-row class="mt-4">
+        <v-col cols="12">
+          <v-card>
+            <v-card-title>Document Store Tests</v-card-title>
+            <v-card-text>
+              <v-text-field v-model="docStoreName" label="Document Store Name (e.g., my-docs-db)" :disabled="!orbitDBInstance" hint="Will be created if it does not exist. Ensure OrbitDB is initialized first (via KV Store section or implicitly)."></v-text-field>
+              <v-btn @click="openOrCreateDocStore" :loading="loading.docStoreOpen" :disabled="!orbitDBInstance || !docStoreName" block class="mb-3">
+                Open/Create Document Store
+              </v-btn>
 
-            <div v-if="currentDocStore">
-              <p class="text-caption">Current Doc Store: <strong>{{ currentDocStore.address?.toString() }}</strong></p>
-              <v-textarea v-model="newDocumentContent" label="New Document JSON Content (e.g., { &quot;name&quot;: &quot;test&quot;, &quot;value&quot;: 123 })" rows="3" class="mt-2"></v-textarea>
-              <v-text-field v-model="newDocumentId" label="Document _id (optional - if empty, OrbitDB assigns one)" hint="If providing, ensure it is unique for new docs."></v-text-field>
-              <v-btn @click="putNewDocument" :loading="loading.docPut" :disabled="!newDocumentContent" block class="mb-3">Put Document</v-btn>
+              <div v-if="currentDocStore">
+                <p class="text-caption">Current Doc Store: <strong>{{ currentDocStore.address?.toString() }}</strong></p>
+                <v-textarea v-model="newDocumentContent" label='New Document JSON Content (e.g., { "name": "test", "value": 123 })' rows="3" class="mt-2"></v-textarea>
+                <v-text-field v-model="newDocumentId" label="Document _id (optional - if empty, OrbitDB assigns one)" hint="If providing, ensure it is unique for new docs."></v-text-field>
+                <v-btn @click="putNewDocument" :loading="loading.docPut" :disabled="!newDocumentContent" block class="mb-3">Put Document</v-btn>
 
-              <v-text-field v-model="docIdToFetch" label="Document _id to Fetch" class="mt-2"></v-text-field>
-              <v-btn @click="fetchDocumentById" :loading="loading.docGet" :disabled="!docIdToFetch" block class="mb-3">Fetch Document by _id</v-btn>
+                <v-text-field v-model="docIdToFetch" label="Document _id to Fetch" class="mt-2"></v-text-field>
+                <v-btn @click="fetchDocumentById" :loading="loading.docGet" :disabled="!docIdToFetch" block class="mb-3">Fetch Document by _id</v-btn>
 
-              <div v-if="fetchedDocument">
-                <h4>Fetched Document:</h4>
-                <pre style="background-color: #f0f0f0; padding: 10px; border-radius: 4px; white-space: pre-wrap;">{{ JSON.stringify(fetchedDocument, null, 2) }}</pre>
+                <div v-if="fetchedDocument">
+                  <h4>Fetched Document:</h4>
+                  <pre style="background-color: #f0f0f0; padding: 10px; border-radius: 4px; white-space: pre-wrap;">{{ JSON.stringify(fetchedDocument, null, 2) }}</pre>
+                </div>
               </div>
-            </div>
-            <p v-else-if="orbitDBInstance">Document Store not yet opened/created. Please provide a name and click above.</p>
-             <p v-else>Initialize OrbitDB first (e.g. via KV Store section) to enable Document Store operations.</p>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+              <p v-else-if="orbitDBInstance">Document Store not yet opened/created. Please provide a name and click above.</p>
+               <p v-else>Initialize OrbitDB first (e.g. via KV Store section) to enable Document Store operations.</p>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
 
-  </v-container>
+    </v-container>
+    <template #fallback>
+      <v-container fluid>
+        <v-row class="text-center">
+          <v-col>
+            <v-progress-circular indeterminate color="primary"></v-progress-circular>
+            <p class="mt-4">Loading P2P Components...</p>
+          </v-col>
+        </v-row>
+      </v-container>
+    </template>
+  </client-only>
 </template>
 
 <script setup lang="ts">
@@ -102,12 +114,12 @@ import {
   putDocument,
   getDocumentById,
   type KeyValueEntry, // Changed MyDataItem to KeyValueEntry for clarity
-  // For Test Case 2, we need more direct imports if not re-exported by orbitdb.ts
-  CustomDIDIdentityProvider,
-  CustomDIDAccessController,
-  mockDidSigningFunction,
-  // mockDidVerificationFunction, // Not directly needed by test client usually
 } from '~/services/orbitdb';
+import {
+  CustomDIDIdentityProvider,
+  mockDidSigningFunction
+} from '~/services/orbitdb-did-identity-provider';
+import { CustomDIDAccessController } from '~/services/orbitdb-did-access-controller';
 
 // Helia and OrbitDBCore are needed for Test Case 2's isolated instance
 import { createHelia } from 'helia';
@@ -395,7 +407,8 @@ async function runTestCase1() {
 
     // 2. Create/Open Owner-Controlled DB
     testCase1Result.value += "\nAttempting to open owner-controlled DB...";
-    ownedDb = await getKeyValueDatabase(ownedDBName, undefined, true);
+    ownedDb = await getKeyValueDatabase(ownedDBName, undefined, true) as any;
+    if (!ownedDb || !ownedDb.address) throw new Error("Owner-controlled DB failed to initialize or has no address.");
     ownedDBAddressForTestCase2.value = ownedDb.address.toString(); // Save for Test Case 2
     testCase1Result.value += `\n  Success: Owner DB '${ownedDBName}' opened at ${ownedDBAddressForTestCase2.value}.`;
 
@@ -406,7 +419,8 @@ async function runTestCase1() {
 
     // 4. Create/Open Public DB
     testCase1Result.value += "\nAttempting to open public DB...";
-    publicDb = await getKeyValueDatabase(TEST_PUBLIC_DB_NAME, undefined, false); // ownerControlled: false
+    publicDb = await getKeyValueDatabase(TEST_PUBLIC_DB_NAME, undefined, false) as any; // ownerControlled: false
+    if (!publicDb || !publicDb.address) throw new Error("Public DB failed to initialize or has no address.");
     testCase1Result.value += `\n  Success: Public DB '${TEST_PUBLIC_DB_NAME}' opened at ${publicDb.address.toString()}.`;
 
     // 5. Write to Public DB

@@ -5,8 +5,26 @@ import { Emitter } from 'strict-event-emitter'; // OrbitDB often uses emitters
 export type DidSigningFunction = (data: string | Uint8Array) => Promise<string>;
 
 // Placeholder for a generic verification function
-export type DidVerificationFunction = (signature: string, data: string | Uint8Array, did: string) => Promise<boolean>;
+export type DidVerificationFunction = (did: string) => Promise<boolean>;
 
+// --- Mock DID Signing and Verification Functions ---
+export const mockDidSigningFunction: (did: string) => DidSigningFunction = (did: string) => {
+  return async (data: string | Uint8Array): Promise<string> => {
+    const dataStr = typeof data === 'string' ? data : new TextDecoder().decode(data);
+    console.log(`[MockSign] DID ${did} signing data: "${dataStr.substring(0,50)}..."`);
+    return `signed(${dataStr})-by(${did})`;
+  };
+};
+
+export const mockDidVerificationFunction: DidVerificationFunction = async (
+  did: string
+): Promise<boolean> => {
+  // This mock now only checks if the DID is "valid" in some mock sense.
+  const isValid = did.startsWith('did:example:');
+  console.log(`[MockVerify] Verifying DID ${did} -> ${isValid}`);
+  return isValid;
+};
+// --- End Mock Functions ---
 
 interface OrbitDBIdentityProviderConstructorParams {
   did: string; // The user's full DID string, e.g., "did:example:12345"
@@ -75,15 +93,29 @@ export class CustomDIDIdentityProvider {
     signature: string,
     did: string, // The DID string (e.g., "did:example:123")
     data: string | Uint8Array,
-    // This verification function would be specific to the DID method.
-    // It needs to resolve the DID to its public key and perform crypto verification.
-    // For example, it might use a library like 'did-resolver' and a JWT library.
+    // This function now validates the DID itself, while the signature is checked here.
     verificationFunction: DidVerificationFunction
   ): Promise<boolean> {
-    console.log(`CustomDIDIdentityProvider: Verifying signature for DID ${did}`);
-    // console.log("[DID_IP] Data to verify (raw):", data, "Signature:", signature);
+    console.log(`CustomDIDIdentityProvider: Verifying identity for DID ${did}`);
     try {
-      return await verificationFunction(signature, data, did);
+      // Step 1: Validate the DID itself using the provided function.
+      const isDidValid = await verificationFunction(did);
+      if (!isDidValid) {
+        console.warn(`[DID_IP] Verification failed: DID ${did} is not considered valid.`);
+        return false;
+      }
+
+      // Step 2: Verify the signature using the mock logic.
+      // In a real implementation, this would use a crypto library.
+      const dataStr = typeof data === 'string' ? data : new TextDecoder().decode(data);
+      const expectedSignature = `signed(${dataStr})-by(${did})`;
+      const isSignatureValid = signature === expectedSignature;
+
+      if (!isSignatureValid) {
+        console.warn(`[DID_IP] Signature verification failed for DID ${did}.`);
+      }
+      
+      return isSignatureValid;
     } catch (e) {
       console.error("Error during signature verification:", e);
       return false;
@@ -116,6 +148,7 @@ export class CustomDIDIdentityProvider {
   static async verify(signature: string, publicKeyOrDid: string, data: string | Uint8Array, verificationFn: DidVerificationFunction): Promise<boolean> {
     // In a DID context, publicKeyOrDid would be the DID string.
     // The 'publicKeyOrDid' parameter name is generic from OrbitDB.
+    // Note: This now passes a DID validation function to verifyIdentity.
     return CustomDIDIdentityProvider.verifyIdentity(signature, publicKeyOrDid, data, verificationFn);
   }
 

@@ -1,182 +1,194 @@
 <template>
-  <v-container fluid class="view-editor-container">
-    <v-row>
-      <v-col cols="12" class="d-flex justify-space-between align-center pb-0">
-        <div>
-          <v-text-field
-            v-model="currentViewName"
-            label="View Name"
-            placeholder="Enter a name for your view"
-            dense
-            hide-details
-            class="mr-4"
-            style="max-width: 400px; display: inline-block;"
-          ></v-text-field>
-        </div>
-        <div>
-          <v-btn @click="loadUserTables(true)" :loading="loadingTables" small density="compact" class="mr-2">Refresh Tables</v-btn>
-          <v-btn @click="openLoadViewDialog" small density="compact" class="mr-2" :disabled="!authStore.isAuthenticated">Load View</v-btn>
-          <v-btn @click="handleSaveView" color="primary" prepend-icon="mdi-content-save" :disabled="designedTables.length === 0 || !currentViewName || !authStore.isAuthenticated" :loading="savingView" density="compact">
-            Save View
-          </v-btn>
-        </div>
-      </v-col>
-      <v-col cols="12" class="pt-0">
-         <p class="text-caption" v-if="currentViewDbAddress">
-            Current View DB Address: {{ currentViewDbAddress }}
-            <v-icon size="small" @click="copyToClipboard(currentViewDbAddress)" title="Copy Address">mdi-clipboard-outline</v-icon>
-          </p>
-      </v-col>
-    </v-row>
+  <client-only>
+    <v-container fluid class="view-editor-container">
+      <v-row>
+        <v-col cols="12" class="d-flex justify-space-between align-center pb-0">
+          <div>
+            <v-text-field
+              v-model="currentViewName"
+              label="View Name"
+              placeholder="Enter a name for your view"
+              dense
+              hide-details
+              class="mr-4"
+              style="max-width: 400px; display: inline-block;"
+            ></v-text-field>
+          </div>
+          <div>
+            <v-btn @click="loadUserTables(true)" :loading="loadingTables" small density="compact" class="mr-2">Refresh Tables</v-btn>
+            <v-btn @click="openLoadViewDialog" small density="compact" class="mr-2" :disabled="!authStore.isAuthenticated">Load View</v-btn>
+            <v-btn @click="handleSaveView" color="primary" prepend-icon="mdi-content-save" :disabled="designedTables.length === 0 || !currentViewName || !authStore.isAuthenticated" :loading="savingView" density="compact">
+              Save View
+            </v-btn>
+          </div>
+        </v-col>
+        <v-col cols="12" class="pt-0">
+           <p class="text-caption" v-if="currentViewDbAddress">
+              Current View DB Address: {{ currentViewDbAddress }}
+              <v-icon size="small" @click="copyToClipboard(currentViewDbAddress)" title="Copy Address">mdi-clipboard-outline</v-icon>
+            </p>
+        </v-col>
+      </v-row>
 
-    <!-- Load View Dialog -->
-    <v-dialog v-model="loadViewDialog" max-width="700px">
-      <v-card>
-        <v-card-title>Load View</v-card-title>
-        <v-card-text>
-          <v-text-field
-            v-model="viewAddressToLoad"
-            label="OrbitDB View Address (or select from list below)"
-            placeholder="Enter the full OrbitDB address of the view"
-            clearable
-            class="mb-3"
-          ></v-text-field>
-
-          <v-divider class="my-4"></v-divider>
-
-          <h4 class="mb-2">My Saved Views</h4>
-          <div v-if="loadingSavedViews" class="text-center pa-4"><v-progress-circular indeterminate></v-progress-circular></div>
-          <v-list dense v-if="!loadingSavedViews && savedViews.length > 0" style="max-height: 300px; overflow-y: auto;">
-            <v-list-item
-              v-for="view in sortedSavedViews"
-              :key="view.viewId"
-              @click="selectViewToLoad(view)"
-              :active="view.viewAddress === viewAddressToLoad"
-              color="primary"
-            >
-              <v-list-item-title>{{ view.viewName }}</v-list-item-title>
-              <v-list-item-subtitle :title="view.viewAddress">
-                ID: {{ view.viewId.substring(0,15) }}...
-                <span v-if="view.lastAccessedTimestamp">Accessed: {{ new Date(view.lastAccessedTimestamp).toLocaleDateString() }}</span>
-              </v-list-item-subtitle>
-              <template v-slot:append>
-                <v-btn icon="mdi-delete-outline" variant="text" size="small" @click.stop="confirmDeleteSavedView(view)" title="Remove from list"></v-btn>
-              </template>
-            </v-list-item>
-          </v-list>
-          <p v-if="!loadingSavedViews && savedViews.length === 0" class="text-caption">
-            No views saved yet. Save a view in the editor to see it here.
-          </p>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn text @click="loadViewDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="confirmLoadViewFromDialog" :disabled="!viewAddressToLoad">Load Selected/Entered</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Confirm Delete Dialog -->
-    <v-dialog v-model="confirmDeleteDialog" max-width="400px">
+      <!-- Load View Dialog -->
+      <v-dialog v-model="loadViewDialog" max-width="700px">
         <v-card>
-            <v-card-title>Confirm Delete</v-card-title>
-            <v-card-text>
-                Are you sure you want to remove "{{ viewToDelete?.viewName }}" from your saved views list? This does not delete the actual view data, only the reference from this list.
-            </v-card-text>
-            <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn text @click="confirmDeleteDialog = false">Cancel</v-btn>
-                <v-btn color="error" @click="executeDeleteSavedView">Delete</v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
-
-
-    <!-- Editor Panes (condensed template for brevity, content taken from previous full version) -->
-    <v-row class="editor-panes mt-2">
-      <v-col cols="12" md="3" class="tables-pane">
-        <v-card class="fill-height">
-          <v-card-title>Available Tables</v-card-title>
+          <v-card-title>Load View</v-card-title>
           <v-card-text>
-            <div v-if="loadingTables" class="text-center pa-4"><v-progress-circular indeterminate></v-progress-circular></div>
-            <v-list dense v-else-if="availableTablesForDisplay.length > 0">
-              <v-list-item v-for="table in availableTablesForDisplay" :key="table.id" @click="() => addTableToDesign(table)" link>
-                <v-list-item-title :title="table.id">{{ table.name }}</v-list-item-title>
-                 <v-list-item-subtitle>{{ table.fields.length }} fields</v-list-item-subtitle>
-                <v-tooltip activator="parent" location="end">ID: {{ table.id }}\nClick to add to design</v-tooltip>
+            <v-text-field
+              v-model="viewAddressToLoad"
+              label="OrbitDB View Address (or select from list below)"
+              placeholder="Enter the full OrbitDB address of the view"
+              clearable
+              class="mb-3"
+            ></v-text-field>
+
+            <v-divider class="my-4"></v-divider>
+
+            <h4 class="mb-2">My Saved Views</h4>
+            <div v-if="loadingSavedViews" class="text-center pa-4"><v-progress-circular indeterminate></v-progress-circular></div>
+            <v-list dense v-if="!loadingSavedViews && savedViews.length > 0" style="max-height: 300px; overflow-y: auto;">
+              <v-list-item
+                v-for="view in sortedSavedViews"
+                :key="view.viewId"
+                @click="selectViewToLoad(view)"
+                :active="view.viewAddress === viewAddressToLoad"
+                color="primary"
+              >
+                <v-list-item-title>{{ view.viewName }}</v-list-item-title>
+                <v-list-item-subtitle :title="view.viewAddress">
+                  ID: {{ view.viewId.substring(0,15) }}...
+                  <span v-if="view.lastAccessedTimestamp">Accessed: {{ new Date(view.lastAccessedTimestamp).toLocaleDateString() }}</span>
+                </v-list-item-subtitle>
+                <template v-slot:append>
+                  <v-btn icon="mdi-delete-outline" variant="text" size="small" @click.stop="confirmDeleteSavedView(view)" title="Remove from list"></v-btn>
+                </template>
               </v-list-item>
             </v-list>
-            <p v-else class="text-caption pa-3">No tables. <v-btn small variant="text" @click="registerSampleTables" :loading="loadingTables">Register Samples</v-btn></p>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" md="9" class="design-surface-pane">
-        <v-card class="fill-height">
-          <v-card-title>View Design Surface</v-card-title>
-          <v-card-text class="design-surface" ref="designSurfaceRef" @dragover.prevent="handleDragOver" @drop.prevent="handleDropOnSurface">
-            <div v-for="(table, index) in designedTables" :key="table.id" :id="'designed_table_' + table.id.replace(/[^a-zA-Z0-9]/g, '_')"
-              class="designed-table-representation" :style="{ top: table.y + 'px', left: table.x + 'px', cursor: 'grab' }"
-              draggable="true" @dragstart="event => handleTableDragStart(event, table, index)" @dragend="handleTableDragEnd">
-              <strong>{{ table.name }}</strong>
-               <ul class="field-list">
-                <li v-for="field in table.fields" :key="field.name" class="field-item">
-                  <v-icon size="x-small" class="mr-1">{{ getFieldIcon(field.type) }}</v-icon>
-                  <span class="field-name">{{ field.name }}</span>
-                  <span class="text-caption grey--text"> ({{ field.type }})</span>
-                  <div
-                    class="field-port"
-                    :data-table-id="table.id"
-                    :data-field-name="field.name"
-                    @mousedown.stop="event => handlePortMouseDown(event, table, field)"
-                  ></div>
-                </li>
-              </ul>
-            </div>
-            <!-- SVG Overlay for drawing lines -->
-            <svg class="relationship-lines-svg" width="100%" height="100%" @click="deselectRelationshipLine">
-              <line
-                v-if="isDrawingLine && lineSourceCoords && currentLineEnd"
-                :x1="lineSourceCoords.x" :y1="lineSourceCoords.y"
-                :x2="currentLineEnd.x" :y2="currentLineEnd.y"
-                stroke="#777" stroke-width="2" stroke-dasharray="5,5"
-              />
-              <g v-for="relLine in linesToRender" :key="relLine.id" @click.stop="handleRelationshipLineClick(relLine.id)" class="relationship-line-group">
-                <!-- Wider invisible line for easier clicking -->
-                <line
-                  :x1="relLine.x1" :y1="relLine.y1"
-                  :x2="relLine.x2" :y2="relLine.y2"
-                  stroke="transparent" stroke-width="10"
-                  style="cursor: pointer;"
-                />
-                <line
-                  :x1="relLine.x1" :y1="relLine.y1"
-                  :x2="relLine.x2" :y2="relLine.y2"
-                  :stroke="selectedRelationshipId === relLine.id ? 'red' : '#555'"
-                  :stroke-width="selectedRelationshipId === relLine.id ? 3 : 2"
-                  style="pointer-events: none;"
-                />
-              </g>
-            </svg>
-            <p class="text-h6 text-center grey--text" v-if="designedTables.length === 0 && !draggedTable">Add tables to design.</p>
-             <p class="text-caption mt-4" v-if="designedTables.length > 0">
-              Drag tables. Click & drag field ports for relationships. Click line & press Del/Backspace to remove.
+            <p v-if="!loadingSavedViews && savedViews.length === 0" class="text-caption">
+              No views saved yet. Save a view in the editor to see it here.
             </p>
           </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn text @click="loadViewDialog = false">Cancel</v-btn>
+            <v-btn color="primary" @click="confirmLoadViewFromDialog" :disabled="!viewAddressToLoad">Load Selected/Entered</v-btn>
+          </v-card-actions>
         </v-card>
-      </v-col>
-    </v-row>
-    <v-row class="criteria-pane-row mt-4">
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>Field Selection & Criteria Grid</v-card-title>
-          <v-card-text>
-            <p class="text-caption mb-2" v-if="designedTables.length === 0">Add tables to the design surface to see their fields here.</p>
-            <UpGrid v-else :column-defs="criteriaGridColDefs" :row-data="criteriaGridRowData" :items-per-page="10" @cell-value-changed="handleCriteriaGridChange" />
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+      </v-dialog>
+
+      <!-- Confirm Delete Dialog -->
+      <v-dialog v-model="confirmDeleteDialog" max-width="400px">
+          <v-card>
+              <v-card-title>Confirm Delete</v-card-title>
+              <v-card-text>
+                  Are you sure you want to remove "{{ viewToDelete?.viewName }}" from your saved views list? This does not delete the actual view data, only the reference from this list.
+              </v-card-text>
+              <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn text @click="confirmDeleteDialog = false">Cancel</v-btn>
+                  <v-btn color="error" @click="executeDeleteSavedView">Delete</v-btn>
+              </v-card-actions>
+          </v-card>
+      </v-dialog>
+
+
+      <!-- Editor Panes (condensed template for brevity, content taken from previous full version) -->
+      <v-row class="editor-panes mt-2">
+        <v-col cols="12" md="3" class="tables-pane">
+          <v-card class="fill-height">
+            <v-card-title>Available Tables</v-card-title>
+            <v-card-text>
+              <div v-if="loadingTables" class="text-center pa-4"><v-progress-circular indeterminate></v-progress-circular></div>
+              <v-list dense v-else-if="availableTablesForDisplay.length > 0">
+                <v-list-item v-for="table in availableTablesForDisplay" :key="table.id" @click="() => addTableToDesign(table)" link>
+                  <v-list-item-title :title="table.id">{{ table.name }}</v-list-item-title>
+                   <v-list-item-subtitle>{{ table.fields.length }} fields</v-list-item-subtitle>
+                  <v-tooltip activator="parent" location="end">ID: {{ table.id }}\nClick to add to design</v-tooltip>
+                </v-list-item>
+              </v-list>
+              <p v-else class="text-caption pa-3">No tables. <v-btn small variant="text" @click="registerSampleTables" :loading="loadingTables">Register Samples</v-btn></p>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="9" class="design-surface-pane">
+          <v-card class="fill-height">
+            <v-card-title>View Design Surface</v-card-title>
+            <v-card-text class="design-surface" ref="designSurfaceRef" @dragover.prevent="handleDragOver" @drop.prevent="handleDropOnSurface">
+              <div v-for="(table, index) in designedTables" :key="table.id" :id="'designed_table_' + table.id.replace(/[^a-zA-Z0-9]/g, '_')"
+                class="designed-table-representation" :style="{ top: table.y + 'px', left: table.x + 'px', cursor: 'grab' }"
+                draggable="true" @dragstart="event => handleTableDragStart(event, table, index)" @dragend="handleTableDragEnd">
+                <strong>{{ table.name }}</strong>
+                 <ul class="field-list">
+                  <li v-for="field in table.fields" :key="field.name" class="field-item">
+                    <v-icon size="x-small" class="mr-1">{{ getFieldIcon(field.type) }}</v-icon>
+                    <span class="field-name">{{ field.name }}</span>
+                    <span class="text-caption grey--text"> ({{ field.type }})</span>
+                    <div
+                      class="field-port"
+                      :data-table-id="table.id"
+                      :data-field-name="field.name"
+                      @mousedown.stop="event => handlePortMouseDown(event, table, field)"
+                    ></div>
+                  </li>
+                </ul>
+              </div>
+              <!-- SVG Overlay for drawing lines -->
+              <svg class="relationship-lines-svg" width="100%" height="100%" @click="deselectRelationshipLine">
+                <line
+                  v-if="isDrawingLine && lineSourceCoords && currentLineEnd"
+                  :x1="lineSourceCoords.x" :y1="lineSourceCoords.y"
+                  :x2="currentLineEnd.x" :y2="currentLineEnd.y"
+                  stroke="#777" stroke-width="2" stroke-dasharray="5,5"
+                />
+                <g v-for="relLine in linesToRender" :key="relLine.id" @click.stop="handleRelationshipLineClick(relLine.id)" class="relationship-line-group">
+                  <!-- Wider invisible line for easier clicking -->
+                  <line
+                    :x1="relLine.x1" :y1="relLine.y1"
+                    :x2="relLine.x2" :y2="relLine.y2"
+                    stroke="transparent" stroke-width="10"
+                    style="cursor: pointer;"
+                  />
+                  <line
+                    :x1="relLine.x1" :y1="relLine.y1"
+                    :x2="relLine.x2" :y2="relLine.y2"
+                    :stroke="selectedRelationshipId === relLine.id ? 'red' : '#555'"
+                    :stroke-width="selectedRelationshipId === relLine.id ? 3 : 2"
+                    style="pointer-events: none;"
+                  />
+                </g>
+              </svg>
+              <p class="text-h6 text-center grey--text" v-if="designedTables.length === 0 && !draggedTable">Add tables to design.</p>
+               <p class="text-caption mt-4" v-if="designedTables.length > 0">
+                Drag tables. Click & drag field ports for relationships. Click line & press Del/Backspace to remove.
+              </p>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+      <v-row class="criteria-pane-row mt-4">
+        <v-col cols="12">
+          <v-card>
+            <v-card-title>Field Selection & Criteria Grid</v-card-title>
+            <v-card-text>
+              <p class="text-caption mb-2" v-if="designedTables.length === 0">Add tables to the design surface to see their fields here.</p>
+              <UpGrid v-else :column-defs="criteriaGridColDefs" :row-data="criteriaGridRowData" :items-per-page="10" @cell-value-changed="handleCriteriaGridChange" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </v-container>
+    <template #fallback>
+      <v-container fluid>
+        <v-row class="text-center">
+          <v-col>
+            <v-progress-circular indeterminate color="primary"></v-progress-circular>
+            <p class="mt-4">Loading View Editor...</p>
+          </v-col>
+        </v-row>
+      </v-container>
+    </template>
+  </client-only>
 </template>
 
 <script setup lang="ts">
@@ -188,7 +200,8 @@ import {
   addSavedView, listSavedViews, removeSavedView, getSavedView,
   type TableMetadata, type TableFieldSchema, type SavedViewInfo
 } from '~/services/userPreferences';
-import { getDocumentStoreDatabase, putDocument, getDocumentById as getOrbitDocById, mockDidVerificationFunction } from '~/services/orbitdb';
+import { getDocumentStoreDatabase, putDocument, getDocumentById as getOrbitDocById } from '~/services/orbitdb';
+import { mockDidVerificationFunction } from '~/services/orbitdb-did-identity-provider';
 import { CustomDIDAccessController } from '~/services/orbitdb-did-access-controller';
 
 const authStore = useAuthStore();
@@ -545,7 +558,8 @@ async function handleSaveView() {
     if (!isNewView && currentViewId.value) viewDefinition._id = currentViewId.value; // Preserve existing OrbitDB document _id
     const dbNameForView = currentViewDbAddress.value || `gridable-viewdef-${viewDefinition.viewId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
     const acOptions = { type: CustomDIDAccessController.type, write: [authStore.currentUser.did], admin: [authStore.currentUser.did], verificationFunction: mockDidVerificationFunction };
-    const viewDb = await getDocumentStoreDatabase(dbNameForView, acOptions);
+    const viewDb: any = await getDocumentStoreDatabase(dbNameForView, acOptions);
+    if (!viewDb || !viewDb.address) throw new Error("View database failed to initialize or has no address.");
     const docId = await putDocument(viewDb, viewDefinition); // putDocument will update if _id exists, or insert if new
     currentViewId.value = viewDefinition._id || viewDefinition.viewId; // Use existing _id or generated viewId
     currentViewDbAddress.value = viewDb.address.toString();
@@ -558,7 +572,7 @@ async function handleSaveView() {
   finally { savingView.value = false; }
 }
 
-async function getMinimalViewDefinitionForTimestamp(dbAddress: string | null): Promise<{ createdTimestamp: number } | null> { if (!dbAddress) return null; try { const db = await getDocumentStoreDatabase(dbAddress); const docs = await db.all(); if (docs.length > 0 && docs[0].value) return docs[0].value; return null; } catch (error) { console.error("Error getting minimal view def for timestamp:", error); return null; } }
+async function getMinimalViewDefinitionForTimestamp(dbAddress: string | null): Promise<{ createdTimestamp: number } | null> { if (!dbAddress) return null; try { const db: any = await getDocumentStoreDatabase(dbAddress); if (!db) return null; const docs = await db.all(); if (docs.length > 0 && docs[0].value) return docs[0].value; return null; } catch (error) { console.error("Error getting minimal view def for timestamp:", error); return null; } }
 async function openLoadViewDialog() { viewAddressToLoad.value = ''; loadViewDialog.value = true; loadingSavedViews.value = true; try { savedViews.value = await listSavedViews(); } catch (error) { console.error("Error loading saved views list:", error); savedViews.value = []; alert("Could not load your saved views list."); } finally { loadingSavedViews.value = false; } }
 function selectViewToLoad(view: SavedViewInfo) { viewAddressToLoad.value = view.viewAddress; }
 
@@ -566,7 +580,11 @@ async function confirmLoadViewFromDialog() {
   if (!viewAddressToLoad.value) { alert("Please select or enter a view address."); return; }
   loadingView.value = true; loadViewDialog.value = false;
   try {
-    const db = await getDocumentStoreDatabase(viewAddressToLoad.value); // AC options are for write, read is usually public or handled by OrbitDB
+    const db: any = await getDocumentStoreDatabase(viewAddressToLoad.value); // AC options are for write, read is usually public or handled by OrbitDB
+    if (!db) {
+      alert("Failed to open the view database at the specified address.");
+      return;
+    }
     const results = await db.all(); // OrbitDB doc stores return array of { hash, key, value }
     if (results && results.length > 0 && results[0].value) {
       const loadedDef = results[0].value as ViewDefinition;

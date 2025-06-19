@@ -8,4 +8,4 @@ The `upGrid` component supports a flexible theming system.
 
 - A `theme` prop accepts a `upGridTheme` object.
 - The `upGridTheme` interface (`../src/components/upGridTheme.ts`) defines the structure for controlling colors, borders, and other visual aspects of the grid.
-- The theming system should allow for easy customization to match the look and feel of any application.
+- The theming system allows for easy customization to match the look and feel of any application.

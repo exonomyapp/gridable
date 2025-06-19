@@ -10,7 +10,39 @@ export default defineNuxtPlugin(nuxtApp => {
     components,
     directives,
     theme: {
-      // The default theme will be 'light'. The theme can be changed dynamically.
+      defaultTheme: 'twitterLight',
+      themes: {
+        twitterLight: {
+          dark: false,
+          colors: {
+            background: '#FFFFFF',
+            surface: '#FFFFFF',
+            primary: '#1DA1F2',
+            'primary-darken-1': '#0c8de8',
+            secondary: '#14171A',
+            'secondary-darken-1': '#000000',
+            error: '#E0245E',
+            info: '#17A2B8',
+            success: '#28A745',
+            warning: '#FFC107',
+          }
+        },
+        twitterDark: {
+          dark: true,
+          colors: {
+            background: '#0D1117',
+            surface: '#0D1117',
+            primary: '#1DA1F2',
+            'primary-darken-1': '#0c8de8',
+            secondary: '#C9D1D9',
+            'secondary-darken-1': '#adbac7',
+            error: '#E0245E',
+            info: '#17A2B8',
+            success: '#28A745',
+            warning: '#FFC107',
+          }
+        }
+      }
     }
   })
   nuxtApp.vueApp.use(vuetify)

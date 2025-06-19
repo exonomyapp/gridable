@@ -1,134 +1,72 @@
 # Gridable - Product Plan and Progress
 
-This document outlines the plan for building the Gridable application.
+This document outlines the plan and current progress for the Gridable application, reflecting the state as of the last architecture review.
 
-## I. Initial Development Phase (Completed)
+## I. Core Architecture & P2P Foundation (Completed)
 
-This phase focused on establishing the foundational structure of the Gridable application, including core UI components, basic data handling, and placeholders for major features.
+This phase established the foundational, decentralized architecture of the Gridable application.
 
 - [x] **1. Project Setup and Configuration:**
-  - [x] Initialized a new Nuxt 3 project (`gridable-app`).
-  - [x] Installed and configured Vuetify for Material Design components.
-  - [x] Set up Pinia for state management.
-  - [x] Established a CSS:Grid-based layout philosophy in `assets/css/layouts/main.css` and `layouts/default.vue`.
-  - [x] Configured Nuxt 3 layers conceptually (created `layers` directory).
+  - [x] Initialized a Nuxt 3 project (`gridable-app`).
+  - [x] Configured the app for **Client-Side Rendering only** (`ssr: false` in `nuxt.config.ts`), a critical requirement for browser-based P2P libraries.
+  - [x] Integrated Vuetify for the UI component library and Pinia for ephemeral state management.
+  - [x] Established the `upGrid` component as a reusable Nuxt Layer.
 
-- [x] **2. OrbitDB Integration - Basic Table Functionality:**
-  - [x] Installed `orbit-db`, `helia`, and related IPFS dependencies.
-  - [x] Created an OrbitDB service (`services/orbitdb.ts`) for Helia initialization, OrbitDB instance creation, and basic key-value database operations (CRUD).
-  - [x] Developed a test page (`pages/testing/orbitdb-test.vue`) to interact with the OrbitDB service and display data using `upGrid`.
+- [x] **2. Core P2P Stack Integration:**
+  - [x] Integrated **Helia** (IPFS) and **OrbitDB** as the core of the data layer.
+  - [x] Created a client-side plugin (`plugins/p2p.client.ts`) to initialize the P2P stack upon user authentication.
+  - [x] Developed a high-level service (`services/orbitdb.ts`) to simplify interactions with OrbitDB.
 
-- [x] **3. View Editor GUI (Placeholder & AG Grid Feature Alignment):**
-  - [x] Created a placeholder UI for the View Editor (`pages/editor/view-editor.vue`).
-  - [x] Designed a three-pane layout (Available Tables, Design Surface, Criteria Grid) inspired by Microsoft Access.
-  - [x] The Criteria Grid section uses the `upGrid` component, aligning with the AG Grid feature goal.
-  - [x] Included placeholder data and TODOs for future interactivity (drag-and-drop, relationship drawing).
+- [x] **3. Decentralized Identity (DID) and Access Control:**
+  - [x] Implemented a mock authentication system (`store/auth.ts`) using a hardcoded DID, serving as the entry point for all P2P services.
+  - [x] Created a custom **DID-based Identity Provider** (`services/orbitdb-did-identity-provider.ts`) to sign database entries with the user's DID.
+  - [x] Implemented a custom **DID-based Access Controller** (`services/orbitdb-did-access-controller.ts`) to enforce write permissions on OrbitDB databases based on an allow-list of DIDs.
+  - [x] Built a comprehensive test page (`pages/testing/orbitdb-test.vue`) to validate the entire P2P stack, including identity and access control rules.
 
-- [x] **4. Authentication System (DID Placeholder):**
-  - [x] Set up a mock DID-based authentication system using a Pinia store (`store/auth.ts`).
-  - [x] Created UI components for login/logout (`LoginButton.vue`) and user profile display (`UserProfileChip.vue`).
-  - [x] Developed placeholder pages for User Profile (`pages/user/profile.vue`) and Settings (`pages/user/settings.vue`).
-  - [x] Integrated authentication display and controls into the main application layout header.
-  - [x] Created placeholder directories for Nuxt 3 authentication layers.
+- [x] **4. User-Specific Data Persistence:**
+  - [x] Implemented the `userPreferences.ts` service to manage user-specific metadata in a private, DID-controlled OrbitDB key-value store.
+  - [x] This service handles persisting the user's registered data tables, saved view definitions, and UI settings (e.g., theme, drawer width).
+  - [x] Integrated this service into the `default.vue` layout to persist UI state.
 
-- [x] **5. Sharing and Collaboration (Placeholder):**
-  - [x] Added a "Share View" button and a placeholder dialog to `view-editor.vue`.
-  - [x] The dialog outlines conceptual options for recipient DID and theme selection when sharing a view.
-  - [x] Documented a conceptual data model (in comments) for a "SharedViewLink" object to be stored in OrbitDB, representing sharing instances.
-
-- [x] **6. Internal Configuration Storage (User Preferences & Grid State):**
-  - [x] Outlined a conceptual structure for storing user preferences and grid-specific UI states in OrbitDB (`services/userPreferences.ts`). This includes global settings and per-view customizations (column order, sort, items per page, etc.).
-  - [x] Enhanced `upGrid` to accept an `initialGridState` prop and emit a `grid-state-change` event for persisting user customizations.
-  - [x] Added UI for items-per-page selection in the grid's pagination.
-  - [x] Updated `grid-test.vue` to demonstrate simulating the loading and saving of grid states.
+- [x] **5. Core Feature: View Editor:**
+  - [x] Developed the `pages/editor/view-editor.vue` page, a complex interface for visually designing database views.
+  - [x] The editor allows users to load table metadata from their `userPreferences` store.
+  - [x] Users can design views by joining tables, selecting fields, and defining criteria.
+  - [x] Completed view definitions are saved as documents in their own new, DID-controlled OrbitDB document store.
 
 ## II. Next Development Phase (Proposed)
 
-This phase will focus on building out the core functionalities, making the placeholders interactive, and implementing the decentralized aspects of the application.
+This phase will focus on replacing mock implementations with real ones, enhancing core features, and building out sharing and collaboration capabilities.
 
-### A. Core Functionality & Interactivity
+### A. Decentralization & Security
 
-- [x] **1. Full OrbitDB Implementation for User & View Configurations (Client-side services and component integration complete; Server-side/OrbitDB Access Control is a critical remaining part for security):**
-  - [x] Implement actual OrbitDB read/write operations in `services/userPreferences.ts` for global and view-specific grid states, linked to the authenticated user's DID. (Completed for KV and Document stores, table metadata, view definitions).
-  - [x] Store and retrieve table definitions/schemas from OrbitDB. (Completed via Table Metadata in `userPreferences.ts`).
-  - [x] Store and retrieve view definitions (designed in View Editor) from OrbitDB. (Completed for single doc per DB).
+- [ ] **1. Real DID-Based Authentication:**
+  - [ ] Select and integrate a full-featured DID library/protocol (e.g., Ceramic, Key DID, ION) to replace the current mock implementation.
+  - [ ] Allow users to sign in with their own DIDs and manage their profiles.
+  - [ ] Implement secure, client-side key management for user DIDs.
 
-- [x] **2. View Editor - Full Functionality (Core features for single-table views implemented):**
-  - [ ] **Visual Design Surface:**
-    - [x] Implement drag-and-drop of available OrbitDB tables onto the design surface. (Basic implementation done).
-    - [x] Enable visual linking (drawing lines) between fields of different tables to define relationships (joins). (Basic UI for drawing, selection, and deletion of links implemented; join type definition and execution pending).
-    - [x] Persist table positions and relationships as part of the view definition. (Positions and basic relationship links are saved).
-  - [ ] **Criteria Grid & View Definition:**
-    - [x] Dynamically populate the criteria grid with fields from tables added to the design surface.
-    - [x] Allow users to select fields for output, define aliases, set sorting orders, and specify complex filter criteria (AG Grid-like). (Basic output toggle, alias, sort, filter implemented).
-    - [~] Implement grouping and aggregation capabilities. (UI for defining 'Group By' and 'Aggregation Function' in criteria grid is complete, including mutual exclusivity. View execution logic for grouping/aggregation is pending).
-    - [x] Save the complete view definition (tables, relationships, criteria) to its own OrbitDB store. (Implemented for current feature set).
-    - [x] Load existing view definitions from OrbitDB into the editor. (Implemented).
-  - [~] Minimal Viable View Execution. (Implemented in `pages/execute/view.vue` for single-table and basic multi-table INNER JOINs; filtering, G&A, sorting adapted for joined data. More join types and advanced query optimization pending).
+- [ ] **2. View Sharing & Collaboration:**
+  - [ ] Design and implement a mechanism for sharing view definitions with other users via their DIDs.
+  - [ ] Use the `orbitdb-did-access-controller` to grant read-only or write access to shared databases.
+  - [ ] Develop a system for users to discover and open views that have been shared with them.
 
-- [x] **3. Testing and Refinement for Phase 2 (Initial pass focusing on upGrid state):**
-  - [x] Enhanced `pages/testing/grid-test.vue` to comprehensively test `upGrid` state persistence (filters, column visibility, sort, order, width) including robust re-initialization via key-swapping.
-  - [ ] TODO: Review and enhance `pages/testing/orbitdb-test.vue` for document store operations.
-  - [ ] TODO: Perform basic usability review of `pages/editor/view-editor.vue` and `pages/execute/view.vue`.
-  - [ ] TODO: Prioritize and implement DID-based Access Control for OrbitDB (critical for security of user data persistence).
+### B. Feature Enhancements
 
-### B. Decentralization & Security
+- [ ] **1. Advanced View Execution:**
+  - [ ] Enhance the view execution engine to support more complex joins, aggregations, and filtering logic defined in the `view-editor`.
+  - [ ] Optimize query performance against OrbitDB data.
 
-- [ ] **4. Real DID-Based Authentication:**
-  - [ ] Select and integrate a DID library/protocol suitable for web applications (e.g., Ceramic, Key DID, ION) allowing users to sign in with their own DIDs.
-  - [ ] Replace mock authentication in `store/auth.ts` with the chosen DID solution, supporting multiple distinct user DID accounts.
-  - [ ] Implement secure key management for DIDs (if handled client-side by the chosen solution).
-  - [ ] Structure DID authentication using Nuxt 3 layers as initially planned.
-  - [ ] Develop DID profile management features (e.g., updating display name, avatar linked to DID).
-  - [ ] Clarify that DIDs are the exclusive mechanism for signing into Gridable; third-party authenticators are for linking external resources, not direct Gridable login.
+- [ ] **2. Data Source Management:**
+  - [ ] Build a UI for users to create and manage their own OrbitDB tables (define schemas, add/edit data directly).
+  - [ ] Implement the functionality to import data from external sources (as proposed in `external-data-sources-proposal.md`) and store it in user-managed OrbitDB tables.
 
-- [ ] **5. Third-Party Authenticators (via Nuxt Layers):**
-  - [ ] Design and implement the system for linking third-party authentications (Google, GitHub, etc.) to *a user's* primary DID. These linked authenticators are *not* for signing into Gridable but for allowing Gridable to potentially access external resources on the user's behalf.
-  - [ ] Develop separate Nuxt 3 layers for each major third-party authenticator.
-  - [ ] Manage credentials and sessions securely.
-  - [ ] Update the Settings page to allow users to connect/disconnect these authenticators.
+- [ ] **3. Theming Engine:**
+  - [ ] Develop a UI for users to create, save, and apply custom themes to the `upGrid` component.
+  - [ ] Store theme definitions in the user's `userPreferences` OrbitDB store.
 
-- [ ] **6. View Sharing & Collaboration (OrbitDB & Helia/IPFS):**
-  - [ ] Implement the "SharedViewLink" concept:
-    - [ ] When a user shares a view, create a "SharedViewLink" record in an OrbitDB store (either the owner's or a shared one).
-    - [ ] This record will point to the view's OrbitDB address and include recipient DIDs and theme/permission settings.
-  - [ ] Publish the view definition (and optionally theme) to IPFS via Helia, making its OrbitDB address shareable.
-  - [ ] Implement a mechanism for recipients to discover and open views shared with their DID.
-  - [ ] Handle permissions (e.g., read-only access for shared views).
+### C. UI/UX Refinements
 
-### C. Theming & User Experience
-
-- [ ] **7. Advanced Theming Engine & Editor:**
-  - [ ] Develop the system-level grid theming editor:
-    - [ ] Allow users to customize every visual aspect of `upGrid`.
-    - [ ] Save themes as OrbitDB objects.
-    - [ ] Manage a library of themes.
-  - [ ] Develop the view-level theming editor:
-    - [ ] Allow styling of specific views when published.
-  - [ ] Support background images and advanced CSS properties in themes.
-  - [ ] Allow sharing of views with or without specific themes, or letting recipients choose.
-
-- [ ] **8. UI/UX Refinements:**
-  - [ ] Conduct thorough testing of all user flows.
-  - [ ] Implement comprehensive error handling and user feedback.
-  - [ ] Optimize performance, especially for grid rendering and OrbitDB interactions.
-  - [ ] Ensure responsive design across different screen sizes.
-  - [ ] Add internationalization (i18n) support.
-
-### D. Storage & Administration (Internal)
-
-- [ ] **9. OrbitDB Table Management:**
-  - [ ] Implement a UI for creating new OrbitDB tables (defining schema: field names, types).
-  - [ ] UI for viewing and editing OrbitDB table schemas.
-  - [ ] UI for directly adding, editing, and deleting data within OrbitDB tables (using `upGrid`).
-  - [ ] Manage OrbitDB table properties (e.g., access controllers, replication settings).
-
-- [ ] **10. Gridable Configuration Storage:**
-  - [ ] Use OrbitDB to store all user-specific data: this includes actual data tables created by the user, as well as internal configurations of Gridable (e.g., list of known tables, user-created views, themes, sharing links, etc.). All such data and configurations are to be cryptographically associated with the user's DID, ensuring data isolation and sovereignty.
-
-- [ ] **11. GUI for Managing OrbitDB Access Control (NEW):**
-    - [ ] Design and implement a user interface for managing Access Controller settings for user-owned OrbitDB databases (e.g., view/table definitions).
-    - [ ] Allow users to view current permissions (e.g., who has write access - typically just themselves for private DBs initially).
-    - [ ] For databases intended for sharing, provide functionality to grant or revoke write/read access to other DIDs (this ties into the "View Sharing & Collaboration" features).
-
-This detailed plan provides a roadmap for transforming the current foundational application into the full-featured Gridable platform.
+- [ ] **4. Usability and Error Handling:**
+  - [ ] Conduct a thorough usability review of the `view-editor` and data management flows.
+  - [ ] Implement comprehensive error handling and user feedback, especially for P2P network operations.
+  - [ ] Ensure the application is fully responsive and accessible.

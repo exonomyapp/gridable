@@ -68,6 +68,12 @@ Gridable uses `upGrid`, a homegrown, feature-rich UI component, for displaying b
 *   **IPFS Implementation:** [Helia](https://helia.io/)
 *   **Authentication:** DIDs (specific library TBD), Nuxt 3 Layers for third-party authenticators.
 
+## Architectural Decisions
+
+This project is configured to run as a **client-side only Single-Page Application (SPA)**, with Server-Side Rendering (SSR) disabled. This is a critical decision based on the project's core dependencies on P2P libraries (Helia, OrbitDB) that require a browser environment.
+
+For a more detailed explanation, please see the [Architecture Documentation](./docs/architecture.md).
+
 ## Project Status
 
 This project is under active development. For detailed progress and planned features, please see the [Product Plan](./docs/gridable-product-plan.md).
